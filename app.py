@@ -3,8 +3,10 @@ from urllib.parse import urlparse, parse_qs
 import requests
 import time
 import configparser
+import json
 
-disallow_type = ["Content-Encoding", "Content-Length", "Date", "Server"]
+disallow_type = ["Content-Encoding", "Content-Length", "Date", "Server", "Connection", "Transfer-Encoding", "Access-Control-Allow-Origin", 
+                 "Access-Control-Allow-Methods", "Access-Control-Allow-Headers", "Strict-Transport-Security"]
 
 qweather_key = "none"
 
@@ -37,10 +39,40 @@ def get_qweather(query):
     r = requests.get(f"https://devapi.qweather.com/v7/weather/now?{query}")
     return r.status_code, r.headers, r.content
 
+# def get_netease_music(query):
+#     r = requests.get(f"https://api.uomg.com/api/rand.music?sort=%E7%83%AD%E6%AD%8C%E6%A6%9C&format=json")
+#     print(r.text)
+#     return r.status_code, r.headers, r.content
+
 def get_netease_music(query):
-    r = requests.get(f"https://api.uomg.com/api/rand.music?sort=%E7%83%AD%E6%AD%8C%E6%A6%9C&format=json")
-    print(r.text)
-    return r.status_code, r.headers, r.content
+    r_data = {"code": 1,
+              "data":{
+                  "name": None,
+                  "artistsname": None,
+                  "url": None,
+                  "picurl": None
+              }
+            }
+    retry_cnt = 3
+    while (retry_cnt):
+        print(f"request: {retry_cnt}")
+        retry_cnt = retry_cnt - 1
+        try:
+            r = requests.get(f"https://api.cenguigui.cn/api/netease/", timeout=5)
+            name = r.json()["data"]["song_name"]
+            artistsname = r.json()["data"]["artist"]
+            url = r.json()["data"]["play_url"]
+            picurl = r.json()["data"]["img"]
+            print(url)
+            if (url[-3:] != "404" and name and artistsname and url and picurl):
+                r_data["data"]["name"] = name
+                r_data["data"]["artistsname"] = artistsname
+                r_data["data"]["url"] = url.replace("https://", "http://")
+                r_data["data"]["picurl"] = picurl.replace("https://", "http://")
+                return r.status_code, r.headers, json.dumps(r_data).encode("utf-8")
+        except:
+            print(f"request err: {retry_cnt}")
+    return None, None, None
 
 # 自定义的请求处理程序
 class MyHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -80,14 +112,18 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(data)
         elif (path == "/netease_music"):
             status_code, header, data = get_netease_music(query)
-            print(header, len(data))
-            self.send_response(status_code)
-            self.send_header("Content-Length", len(data))
-            for type in header:
-                if (type not in disallow_type):
-                    self.send_header(type, header[type])
-            self.end_headers()
-            self.wfile.write(data)
+            if (data):
+                print(header, len(data))
+                self.send_response(status_code)
+                self.send_header("Content-Length", len(data))
+                for type in header:
+                    if (type not in disallow_type):
+                        self.send_header(type, header[type])
+                self.end_headers()
+                self.wfile.write(data)
+            else:
+                self.send_response(404)
+                self.end_headers()
 
 config_init()
 server_address = ('', 8888)
