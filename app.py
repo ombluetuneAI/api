@@ -138,11 +138,16 @@ def fm_get_cur_id_info(id):
     data = r.json()
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
     picurl = data["album"]["cover"]
-    name = data["album"]["title"]
+    artistsname = data["album"]["title"]
+
+    flag = 0
     for day in data["pList"]:
+        if (flag == 0):
+            flag += 1
+            continue
         d_data = data["pList"][day]
         for i in d_data:
-            artistsname = i["title"]
+            name = i["title"]
             start_time = i["start_time"].replace(":", "")
             end_time = i["end_time"].replace(":", "")
             url = f"http://lcache.qtfm.cn/cache/{yesterday}/{id}/{id}_{yesterday}_{start_time}_{end_time}_24_0.aac"
@@ -157,6 +162,18 @@ def fm_get_cur_id_info(id):
 
 def get_rand_radio(query):
     ids = csv_read_list("fm_id.csv")
+    music_infos = fm_get_cur_id_info(random.choice(ids)[0])
+    music_info = random.choice(music_infos)
+    if (music_info):
+        r_data = {
+            "code": 1,
+            "data": music_info
+        }
+        return json.dumps(r_data).encode("utf-8")
+    return None
+
+def get_favorite_radio(query):
+    ids = csv_read_list("favorite_radio.csv")
     music_infos = fm_get_cur_id_info(random.choice(ids)[0])
     music_info = random.choice(music_infos)
     if (music_info):
@@ -229,6 +246,16 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.send_response(404)
         elif (path == "/rand_radio"):
             data = get_rand_radio(query)
+            if (data):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", len(data))
+                self.end_headers()
+                self.wfile.write(data)
+            else:
+                self.send_response(404)
+        elif (path == "/favorite_radio"):
+            data = get_favorite_radio(query)
             if (data):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
