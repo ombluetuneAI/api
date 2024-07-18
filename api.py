@@ -140,24 +140,21 @@ def fm_get_cur_id_info(id):
     picurl = data["album"]["cover"]
     artistsname = data["album"]["title"]
 
-    flag = 0
-    for day in data["pList"]:
-        if (flag == 0):
-            flag += 1
-            continue
-        d_data = data["pList"][day]
-        for i in d_data:
-            name = i["title"]
-            start_time = i["start_time"].replace(":", "")
-            end_time = i["end_time"].replace(":", "")
-            url = f"http://lcache.qtfm.cn/cache/{yesterday}/{id}/{id}_{yesterday}_{start_time}_{end_time}_24_0.aac"
-            music_infos.append({
-                "name": name,
-                "artistsname": artistsname,
-                "url": url,
-                "picurl": picurl
-            })
-        break
+    today = datetime.now().weekday()
+    today = (today + 1) if (today + 1) <= 6 else 7  
+
+    d_data = data["pList"][str(today)]
+    for i in d_data:
+        name = i["title"]
+        start_time = i["start_time"].replace(":", "")
+        end_time = i["end_time"].replace(":", "")
+        url = f"http://lcache.qtfm.cn/cache/{yesterday}/{id}/{id}_{yesterday}_{start_time}_{end_time}_24_0.aac"
+        music_infos.append({
+            "name": name,
+            "artistsname": artistsname,
+            "url": url,
+            "picurl": picurl
+        })
     return music_infos
 
 def get_rand_radio(query):
