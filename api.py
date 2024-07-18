@@ -15,23 +15,17 @@ disallow_type = ["Content-Encoding", "Content-Length", "Date", "Server", "Connec
 qweather_key = "none"
 
 def config_init():
-    global file_server_token
     global qweather_key
 
     config = configparser.ConfigParser()
     config.read("config.ini", encoding="utf-8")
 
     sections = config.sections()
-    if ("file sever" in sections):
-        options = config.options("file sever")
-        if ("token" in options):
-            file_server_token = config.get("file sever", "token")
     if ("qweather" in sections):
         options = config.options("qweather")
         if ("key" in options):
             qweather_key = config.get("qweather", "key")
-    
-    print(file_server_token, qweather_key)
+            print(qweather_key)
 
 def csv_read_list(path):
 
