@@ -7,7 +7,8 @@ import json
 import os
 import csv
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import threading
 
 disallow_type = ["Content-Encoding", "Content-Length", "Date", "Server", "Connection", "Transfer-Encoding", "Access-Control-Allow-Origin", 
                  "Access-Control-Allow-Methods", "Access-Control-Allow-Headers", "Strict-Transport-Security"]
@@ -41,6 +42,23 @@ def csv_read_list(path):
 
     return data
 
+def csv_write_list(path, user_data, mode):
+    if (len(user_data) == 0):
+        return
+    f = open(path, mode, encoding="utf-8", newline="")
+    csv_write = csv.writer(f)
+    csv_write.writerows(user_data)
+
+def _audio_csv_2_json(csv_data):
+    info = {
+        "name": csv_data[0],
+        "artistsname": csv_data[1],
+        "url": csv_data[2],
+        "picurl": csv_data[3]
+    }
+    return info
+
+
 location = "113.96,22.57"
 def get_weather():
     r = requests.get(f"https://devapi.qweather.com/v7/weather/now?location={location}&key={qweather_key}")
@@ -70,18 +88,8 @@ def netease_get_rand_music():
             music =  csv_read_list("netease_music.csv")
             # 读取随机行
             rand_row = random.choice(music)
-            name = rand_row[0]
-            artistsname = rand_row[1]
-            url = rand_row[2]
-            picurl = rand_row[3]
-            r = requests.get(url)
-            url = r.url
-            if (url[-3:] != "404"):
-                info["name"] = name
-                info["artistsname"] = artistsname
-                info["url"] = url
-                info["picurl"] = picurl
-                return info
+            info = _audio_csv_2_json(rand_row)
+            return info
         except:
             print("get err")
     return None
@@ -131,6 +139,8 @@ def fm_get_cur_id_info(id):
     r = requests.get(f"https://webapi.qingting.fm/api/pc/radio/{id}")
     data = r.json()
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
+    if (data["album"] == []):
+        return []
     picurl = data["album"]["cover"]
     artistsname = data["album"]["title"]
 
@@ -151,6 +161,28 @@ def fm_get_cur_id_info(id):
         })
     return music_infos
 
+def fm_get_cur_id_info_csv(id):
+    music_infos = []
+    r = requests.get(f"https://webapi.qingting.fm/api/pc/radio/{id}")
+    data = r.json()
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
+    if (data["album"] == []):
+        return []
+    picurl = data["album"]["cover"]
+    artistsname = data["album"]["title"]
+
+    today = datetime.now().weekday()
+    today = (today + 1) if (today + 1) <= 6 else 7  
+
+    d_data = data["pList"][str(today)]
+    for i in d_data:
+        name = i["title"]
+        start_time = i["start_time"].replace(":", "")
+        end_time = i["end_time"].replace(":", "")
+        url = f"http://lcache.qtfm.cn/cache/{yesterday}/{id}/{id}_{yesterday}_{start_time}_{end_time}_24_0.aac"
+        music_infos.append([name,artistsname, url, picurl])
+    return music_infos
+
 def get_rand_radio(query):
     ids = csv_read_list("fm_id.csv")
     music_infos = fm_get_cur_id_info(random.choice(ids)[0])
@@ -164,9 +196,8 @@ def get_rand_radio(query):
     return None
 
 def get_favorite_radio(query):
-    ids = csv_read_list("favorite_radio.csv")
-    music_infos = fm_get_cur_id_info(random.choice(ids)[0])
-    music_info = random.choice(music_infos)
+    music_infos = csv_read_list("favorite_radio_table.csv")
+    music_info = _audio_csv_2_json(random.choice(music_infos))
     if (music_info):
         r_data = {
             "code": 1,
@@ -174,6 +205,25 @@ def get_favorite_radio(query):
         }
         return json.dumps(r_data).encode("utf-8")
     return None
+
+def radio_list_update(file_in, file_out):
+    print(f"radio_list_update {file_in}")
+    radios = []
+    ids = csv_read_list(file_in)
+    for id in ids:
+        radios += fm_get_cur_id_info_csv(id[0])
+    
+    csv_write_list(file_out, radios, "w")
+
+def update_task():
+    force_update = False
+    if not os.path.exists("favorite_radio_table.csv"):
+        force_update = True
+    while (1):
+        hour = datetime.now(timezone.utc).hour + 8
+        if (hour == 2 or force_update):
+            radio_list_update("favorite_radio.csv", "favorite_radio_table.csv")
+            time.sleep(3600 * 2)
 
 # 自定义的请求处理程序
 class MyHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -257,6 +307,8 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.send_response(404)
 
 
+update_handle = threading.Thread(target=update_task).start()
+print("start server")
 config_init()
 server_address = ('', 8888)
 httpd = HTTPServer(server_address, MyHTTPRequestHandler)
