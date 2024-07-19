@@ -9,6 +9,7 @@ import csv
 import random
 from datetime import datetime, timedelta, timezone
 import threading
+from netease import NetEase
 
 disallow_type = ["Content-Encoding", "Content-Length", "Date", "Server", "Connection", "Transfer-Encoding", "Access-Control-Allow-Origin", 
                  "Access-Control-Allow-Methods", "Access-Control-Allow-Headers", "Strict-Transport-Security"]
@@ -206,6 +207,29 @@ def get_favorite_radio(query):
         return json.dumps(r_data).encode("utf-8")
     return None
 
+def get_netease_top_list():
+    mp3 = 'http://music.163.com/song/media/outer/url?id='
+    lrc = 'http://music.163.com/api/song/lyric?id='
+
+    netease = NetEase()
+    all_data = netease.top_songlist()
+    csv_data = []
+
+    for data in all_data:
+        url = mp3 + str(data['id'])
+        lrc_url = lrc + str(data['id']) + '&lv=-1&kv=-1&tv=-1'
+        pic_url = data['artists'][0]['picUrl']
+        name = data['name']
+        artist = data['artists'][0]['name']
+        csv_data.append([name, artist, url, pic_url, lrc_url])
+
+    return csv_data
+
+def netease_list_update(file_out):
+    print(f"radio_list_update")
+    music = get_netease_top_list()
+    csv_write_list(file_out, music, "w")
+
 def radio_list_update(file_in, file_out):
     print(f"radio_list_update {file_in}")
     radios = []
@@ -216,12 +240,13 @@ def radio_list_update(file_in, file_out):
     csv_write_list(file_out, radios, "w")
 
 def update_task():
-    force_update = False
     if not os.path.exists("favorite_radio_table.csv"):
-        force_update = True
+        radio_list_update("favorite_radio.csv", "favorite_radio_table.csv")
+    if not os.path.exists("netease_music.csv"):
+        netease_list_update("netease_music.csv")
     while (1):
         hour = datetime.now(timezone.utc).hour + 8
-        if (hour == 2 or force_update):
+        if (hour == 2):
             radio_list_update("favorite_radio.csv", "favorite_radio_table.csv")
             time.sleep(3600 * 2)
 
