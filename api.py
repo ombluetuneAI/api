@@ -226,7 +226,7 @@ def get_netease_top_list():
     return csv_data
 
 def netease_list_update(file_out):
-    print(f"radio_list_update")
+    print(f"netease_list_update")
     music = get_netease_top_list()
     csv_write_list(file_out, music, "w")
 
@@ -248,7 +248,10 @@ def update_task():
         hour = datetime.now(timezone.utc).hour + 8
         if (hour == 2):
             radio_list_update("favorite_radio.csv", "favorite_radio_table.csv")
-            time.sleep(3600 * 2)
+            netease_list_update("netease_music.csv")
+            time.sleep(3600 * 10)
+        else:
+            time.sleep(1800)
 
 # 自定义的请求处理程序
 class MyHTTPRequestHandler(BaseHTTPRequestHandler):
