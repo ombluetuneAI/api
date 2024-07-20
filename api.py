@@ -245,7 +245,8 @@ def update_task():
     if not os.path.exists("netease_music.csv"):
         netease_list_update("netease_music.csv")
     while (1):
-        hour = datetime.now(timezone.utc).hour + 8
+        # 北京时间
+        hour = (datetime.now(timezone.utc).hour + 8) % 24
         if (hour == 2):
             radio_list_update("favorite_radio.csv", "favorite_radio_table.csv")
             netease_list_update("netease_music.csv")
