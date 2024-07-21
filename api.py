@@ -10,6 +10,8 @@ import random
 from datetime import datetime, timedelta, timezone
 import threading
 from netease import NetEase
+from io import BytesIO
+from PIL import Image
 
 disallow_type = ["Content-Encoding", "Content-Length", "Date", "Server", "Connection", "Transfer-Encoding", "Access-Control-Allow-Origin", 
                  "Access-Control-Allow-Methods", "Access-Control-Allow-Headers", "Strict-Transport-Security"]
@@ -207,6 +209,27 @@ def get_favorite_radio(query):
         return json.dumps(r_data).encode("utf-8")
     return None
 
+def pic_resize(pic_url, w, h):
+    r = requests.get(pic_url)
+    if (r.status_code == 200):
+        img_io = BytesIO(r.content)
+        img = Image.open(img_io)
+        if (w > h and img.width > w):
+            height = h
+            width = int(img.width * height / img.height)
+        elif (w <= h and img.height > h):
+            width = w
+            height = int(img.height * width / img.width)
+        else:
+            return img_io.getvalue(), img.format.lower()
+        print(f"{img.width}*{img.height} to {width}*{height}")
+        resize_image = img.resize((width, height))
+        img_out_io = BytesIO()
+        resize_image.save(img_out_io, img.format)
+        return img_out_io.getvalue(), img.format.lower()
+    else:
+        return None, None
+
 def get_netease_top_list():
     mp3 = 'http://music.163.com/song/media/outer/url?id='
     lrc = 'http://music.163.com/api/song/lyric?id='
@@ -259,15 +282,11 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         # 解析请求路径和参数
         parsed_path = urlparse(self.path)
-        query_params = parse_qs(parsed_path.query)
-        print(parsed_path, query_params)
-
-        # 获取请求参数值
         path = parsed_path.path
         query = parsed_path.query
+        query_params = parse_qs(query)
 
-        # param1_value = query_params.get('param1', [''])[0]
-        # param2_value = query_params.get('param2', [''])[0]
+        print(parsed_path, query_params)
 
         print(path)
         if (path == "/weather"):
@@ -332,6 +351,19 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.send_header("Content-Length", len(data))
                 self.end_headers()
                 self.wfile.write(data)
+            else:
+                self.send_response(404)
+        elif (path == "/pic_resize"):
+            pic_url = query_params.get('url', [''])[0]
+            width = int(query_params.get('w', [''])[0])
+            height = int(query_params.get('h', [''])[0])
+            image,format = pic_resize(pic_url, width, height)
+            if (image):
+                self.send_response(200)
+                self.send_header("Content-Type", f"image/{format}")
+                self.send_header("Content-Length", len(image))
+                self.end_headers()
+                self.wfile.write(image)
             else:
                 self.send_response(404)
 
