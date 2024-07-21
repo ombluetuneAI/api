@@ -366,6 +366,23 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(image)
             else:
                 self.send_response(404)
+        elif (path == "/proxy"):
+            url = query_params.get('url', [''])[0]
+            list = {}
+            if (os.path.exists("http_remap.json")):
+                with open("http_remap.json", "r", encoding="utf-8") as f:
+                    list = json.load(f)
+            if ('http' not in url):
+                url = f'http://{url}'
+            for a in list:
+                if (a in url):
+                    url = url.replace(a, list[a])
+            print(f"request: {url}")
+            response = requests.get(url)
+            self.send_response(200)
+            self.send_header('Content-type', response.headers['Content-Type'])
+            self.end_headers()
+            self.wfile.write(response.content)
 
 
 update_handle = threading.Thread(target=update_task).start()
