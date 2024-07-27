@@ -47,23 +47,33 @@ class Proxy:
     def delete(self, ip):
         self.proxy_pool.remove(ip)
         self._save_proxy()
+        print(f"delete proxy({len(self.proxy_pool)}): {ip}")
 
     def _proxy_task(self):
-        check_time = time.time()
+        next_gen_time = time.time()
+        next_check_time = time.time()
         while True:
-            self._generate_proxy()
-            if (len(self.proxy_pool) < 10):
-                time.sleep(2)
-            else:
-                time.sleep(random.randint(20, 3600))
+            # 生成新的代理
+            if (time.time() >= next_gen_time):
+                self._generate_proxy()
+                if (len(self.proxy_pool) < 10):
+                    next_gen_time = time.time() + 2
+                else:
+                    next_gen_time = time.time() + random.randint(20, 3600)
+                print(f"next gen time {int(next_gen_time - time.time())}")
             
             # 重新检查代理是否有效
-            if (time.time() - check_time > 4 * 3600):
+            if (time.time() >= next_check_time):
+                print("timing check proxy pool")
                 for ip in self.proxy_pool:
                     if (self._verify_proxy(ip) == False):
                         self.delete(ip)
+                next_check_time = time.time() + 3600 * 4
+                print(f"next check time {int(next_check_time - time.time())}")
+            
+            time.sleep(10)
 
-    def _save_proxy(self, ip):
+    def _save_proxy(self):
         w_data = []
         for i in self.proxy_pool:
             w_data.append([i])
@@ -76,6 +86,7 @@ class Proxy:
             self._save_proxy()
 
     def _generate_proxy(self):
+        print("generate proxy")
         ip = self.get()
         proxies = None
         if (ip != None):
@@ -86,16 +97,20 @@ class Proxy:
                 if (self._verify_proxy(ip) == True):
                     self._add_proxy(ip)
         except:
-            print("request proxy error")
+            print("generate proxy error")
 
     def _verify_proxy(self, proxy):
+        ret = False
         try:
-            r = requests.get("http://icanhazip.com/", proxies={"http": "http://{}".format(proxy)}, timeout=1, headers={'User-Agent':str(UserAgent().random)})
+            r = requests.get("http://icanhazip.com/", proxies={"http": "http://{}".format(proxy)}, timeout=2, headers={'User-Agent':str(UserAgent().random)})
             if (r.status_code == 200):
                 if (r.text.replace("\n", "") == str(proxy.split(":")[0])):
-                    return True
+                    ret = True
         except:
-            return False
+            pass
+        if (ret == False):
+            print(f"verify {proxy} error")
+        return ret
 
 def config_init():
     global qweather_key
