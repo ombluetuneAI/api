@@ -383,6 +383,13 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_header('Content-type', response.headers['Content-Type'])
             self.end_headers()
             self.wfile.write(response.content)
+        elif (path == "/update_list"):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"exec update_list finished")
+            radio_list_update("favorite_radio.csv", "favorite_radio_table.csv")
+            netease_list_update("netease_music.csv")
+            
 
 
 update_handle = threading.Thread(target=update_task).start()
