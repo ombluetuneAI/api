@@ -241,7 +241,7 @@ def get_netease_top_list():
     for data in all_data:
         url = mp3 + str(data['id'])
         lrc_url = lrc + str(data['id']) + '&lv=-1&kv=-1&tv=-1'
-        pic_url = data['artists'][0]['picUrl']
+        pic_url = data["album"]["picUrl"]
         name = data['name']
         artist = data['artists'][0]['name']
         csv_data.append([name, artist, url, pic_url, lrc_url])
