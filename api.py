@@ -13,6 +13,7 @@ from netease import NetEase
 from io import BytesIO
 from PIL import Image
 from fake_useragent import UserAgent
+import logging
 
 disallow_type = ["Content-Encoding", "Content-Length", "Date", "Server", "Connection", "Transfer-Encoding", "Access-Control-Allow-Origin", 
                  "Access-Control-Allow-Methods", "Access-Control-Allow-Headers", "Strict-Transport-Security"]
@@ -47,7 +48,7 @@ class Proxy:
     def delete(self, ip):
         self.proxy_pool.remove(ip)
         self._save_proxy()
-        print(f"delete proxy({len(self.proxy_pool)}): {ip}")
+        logging.info(f"delete proxy({len(self.proxy_pool)}): {ip}")
 
     def _proxy_task(self):
         next_gen_time = time.time()
@@ -60,16 +61,16 @@ class Proxy:
                     next_gen_time = time.time() + 2
                 else:
                     next_gen_time = time.time() + random.randint(20, 3600)
-                print(f"next gen time {int(next_gen_time - time.time())}")
+                logging.info(f"next gen time {int(next_gen_time - time.time())}")
             
             # 重新检查代理是否有效
             if (time.time() >= next_check_time):
-                print("timing check proxy pool")
+                logging.info("timing check proxy pool")
                 for ip in self.proxy_pool:
                     if (self._verify_proxy(ip) == False):
                         self.delete(ip)
                 next_check_time = time.time() + 3600 * 4
-                print(f"next check time {int(next_check_time - time.time())}")
+                logging.info(f"next check time {int(next_check_time - time.time())}")
             
             time.sleep(10)
 
@@ -82,11 +83,11 @@ class Proxy:
     def _add_proxy(self, ip):
         if (ip not in self.proxy_pool):
             self.proxy_pool.append(ip)
-            print(f"add proxy({len(self.proxy_pool)}): {ip}")
+            logging.info(f"add proxy({len(self.proxy_pool)}): {ip}")
             self._save_proxy()
 
     def _generate_proxy(self):
-        print("generate proxy")
+        logging.info("generate proxy")
         ip = self.get()
         proxies = None
         if (ip != None):
@@ -97,7 +98,7 @@ class Proxy:
                 if (self._verify_proxy(ip) == True):
                     self._add_proxy(ip)
         except:
-            print("generate proxy error")
+            logging.info("generate proxy error")
 
     def _verify_proxy(self, proxy):
         ret = False
@@ -109,9 +110,20 @@ class Proxy:
         except:
             pass
         if (ret == False):
-            print(f"verify {proxy} error")
+            logging.info(f"verify {proxy} error")
         return ret
 
+def log_init():
+    # 配置日志
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s %(levelname)s %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S',
+                        handlers=[
+                            logging.FileHandler('run.log'),  # 文件日志处理器
+                            logging.StreamHandler()  # 控制台日志处理器
+                        ]
+                    )
+    
 def config_init():
     global qweather_key
 
@@ -123,7 +135,7 @@ def config_init():
         options = config.options("qweather")
         if ("key" in options):
             qweather_key = config.get("qweather", "key")
-            print(qweather_key)
+            logging.info(qweather_key)
 
 def csv_read_list(path):
 
@@ -167,7 +179,7 @@ def get_qweather(query):
 
 # def get_netease_music(query):
 #     r = requests.get(f"https://api.uomg.com/api/rand.music?sort=%E7%83%AD%E6%AD%8C%E6%A6%9C&format=json")
-#     print(r.text)
+#     logging.info(r.text)
 #     return r.status_code, r.headers, r.content
 
 def netease_get_rand_music():
@@ -179,7 +191,7 @@ def netease_get_rand_music():
     }
     retry_cnt = 10
     while (retry_cnt):
-        print(f"request: {retry_cnt}")
+        logging.info(f"request: {retry_cnt}")
         retry_cnt = retry_cnt - 1
         try:
             music =  csv_read_list("netease_music.csv")
@@ -188,7 +200,7 @@ def netease_get_rand_music():
             info = _audio_csv_2_json(rand_row)
             return info
         except:
-            print("get err")
+            logging.info("get err")
     return None
 
 # def get_netease_music(query):
@@ -202,7 +214,7 @@ def netease_get_rand_music():
 #             }
 #     retry_cnt = 3
 #     while (retry_cnt):
-#         print(f"request: {retry_cnt}")
+#         logging.info(f"request: {retry_cnt}")
 #         retry_cnt = retry_cnt - 1
 #         try:
 #             r = requests.get(f"https://api.cenguigui.cn/api/netease/", timeout=5)
@@ -210,7 +222,7 @@ def netease_get_rand_music():
 #             artistsname = r.json()["data"]["artist"]
 #             url = r.json()["data"]["play_url"]
 #             picurl = r.json()["data"]["img"]
-#             print(url)
+#             logging.info(url)
 #             if (url[-3:] != "404" and name and artistsname and url and picurl):
 #                 r_data["data"]["name"] = name
 #                 r_data["data"]["artistsname"] = artistsname
@@ -218,7 +230,7 @@ def netease_get_rand_music():
 #                 r_data["data"]["picurl"] = picurl.replace("https://", "http://")
 #                 return r.status_code, r.headers, json.dumps(r_data).encode("utf-8")
 #         except:
-#             print(f"request err: {retry_cnt}")
+#             logging.info(f"request err: {retry_cnt}")
 #     return None, None, None
 
 def get_rand_music(query):
@@ -316,7 +328,7 @@ def pic_resize(pic_url, w, h):
             height = int(img.height * width / img.width)
         else:
             return img_io.getvalue(), img.format.lower()
-        print(f"{img.width}*{img.height} to {width}*{height}")
+        logging.info(f"{img.width}*{img.height} to {width}*{height}")
         resize_image = img.resize((width, height))
         img_out_io = BytesIO()
         resize_image.save(img_out_io, img.format)
@@ -343,12 +355,12 @@ def get_netease_top_list():
     return csv_data
 
 def netease_list_update(file_out):
-    print(f"netease_list_update")
+    logging.info(f"netease_list_update")
     music = get_netease_top_list()
     csv_write_list(file_out, music, "w")
 
 def radio_list_update(file_in, file_out):
-    print(f"radio_list_update {file_in}")
+    logging.info(f"radio_list_update {file_in}")
     radios = []
     ids = csv_read_list(file_in)
     for id in ids:
@@ -379,13 +391,12 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
         path = parsed_path.path
         query = parsed_path.query
         query_params = parse_qs(query)
+        
+        logging.info(parsed_path)
 
-        print(parsed_path, query_params)
-
-        print(path)
+        logging.info(path)
         if (path == "/weather"):
             status_code, header, data = get_weather()
-            print(header, len(data))
             self.send_response(status_code)
             self.send_header("Content-Length", len(data))
             for type in header:
@@ -395,7 +406,6 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(data)
         elif (path == "/qweather"):
             status_code, header, data = get_qweather(query)
-            print(header, len(data))
             self.send_response(status_code)
             self.send_header("Content-Length", len(data))
             for type in header:
@@ -406,7 +416,6 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
         # elif (path == "/netease_music"):
         #     status_code, header, data = get_netease_music(query)
         #     if (data):
-        #         print(header, len(data))
         #         self.send_response(status_code)
         #         self.send_header("Content-Length", len(data))
         #         for type in header:
@@ -471,7 +480,7 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
             for a in list:
                 if (a in url):
                     url = url.replace(a, list[a])
-            print(f"request: {url}")
+            logging.info(f"request: {url}")
             response = requests.get(url)
             self.send_response(200)
             self.send_header('Content-type', response.headers['Content-Type'])
@@ -489,12 +498,13 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(ip.encode())
             
-
+log_init()
 proxy = Proxy()
 proxy.start()
 update_handle = threading.Thread(target=update_task).start()
-print("start server")
+logging.info("start server")
 config_init()
 server_address = ('', 8888)
 httpd = HTTPServer(server_address, MyHTTPRequestHandler)
 httpd.serve_forever()
+
