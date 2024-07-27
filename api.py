@@ -20,6 +20,7 @@ disallow_type = ["Content-Encoding", "Content-Length", "Date", "Server", "Connec
 
 qweather_key = "none"
 proxy = None
+en_proxy_task = False
 
 class Proxy:
     def __init__(self):
@@ -126,6 +127,7 @@ def log_init():
     
 def config_init():
     global qweather_key
+    global en_proxy_task
 
     config = configparser.ConfigParser()
     config.read("config.ini", encoding="utf-8")
@@ -136,6 +138,10 @@ def config_init():
         if ("key" in options):
             qweather_key = config.get("qweather", "key")
             logging.info(qweather_key)
+    if ("proxy" in sections):
+        options = config.options("proxy")
+        if ("enable" in options):
+            en_proxy_task = (config.get("proxy", "enable") == "1")
 
 def csv_read_list(path):
 
@@ -493,17 +499,21 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
             radio_list_update("favorite_radio.csv", "favorite_radio_table.csv")
             netease_list_update("netease_music.csv")
         elif (path == "/get_proxy"):
-            ip = proxy.get()
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(ip.encode())
+            if (en_proxy_task == True):
+                ip = proxy.get()
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(ip.encode())
+            else:
+                self.send_response(404)
             
 log_init()
-proxy = Proxy()
-proxy.start()
+config_init()
+if (en_proxy_task == True):
+    proxy = Proxy()
+    proxy.start()
 update_handle = threading.Thread(target=update_task).start()
 logging.info("start server")
-config_init()
 server_address = ('', 8888)
 httpd = HTTPServer(server_address, MyHTTPRequestHandler)
 httpd.serve_forever()
