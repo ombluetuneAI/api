@@ -21,7 +21,7 @@ default_timeout = 10
 
 
 class NetEase:
-    def __init__(self):
+    def __init__(self, proxy=None):
         self.header = {
             'Accept': '*/*',
             'Accept-Encoding': 'gzip,deflate,sdch',
@@ -35,18 +35,23 @@ class NetEase:
         self.cookies = {
             'appver': '1.5.2'
         }
+        if (proxy == None):
+            self.proxies = None
+        else:
+            self.proxies = {"http": f"http://{proxy}"}
 
-    def httpRequest(self, method, action, query=None, urlencoded=None, callback=None, timeout=None):    
+    def httpRequest(self, method, action, query=None, urlencoded=None, callback=None, timeout=None):
         if(method == 'GET'):
             url = action if (query == None) else (action + '?' + query)
-            connection = requests.get(url, headers=self.header, timeout=default_timeout)
+            connection = requests.get(url, headers=self.header, timeout=default_timeout, proxies=self.proxies)
 
         elif(method == 'POST'):
             connection = requests.post(
                 action,
                 data=query,
                 headers=self.header,
-                timeout=default_timeout
+                timeout=default_timeout,
+                proxies=self.proxy
             )
 
         connection.encoding = "UTF-8"
@@ -101,7 +106,7 @@ class NetEase:
         action = 'http://music.163.com/api/playlist/list?cat=' + category + '&order=' + order + '&offset=' + str(offset) + '&total=' + ('true' if offset else 'false') + '&limit=' + str(limit)
         try:
             data = self.httpRequest('GET', action)
-            return data['playlists']
+            return data['playlists'], data['total']
         except:
             return []
 
@@ -127,7 +132,7 @@ class NetEase:
     def top_songlist(self, offset=0, limit=100):
         action = 'http://music.163.com/discover/toplist?id=3778678'
         try:
-            connection = requests.get(action, headers=self.header, timeout=default_timeout)
+            connection = self.httpRequest('GET', action)
             connection.encoding = 'UTF-8'
             songids = re.findall(r'/song\?id=(\d+)', connection.text)
             if songids == []:
@@ -182,7 +187,7 @@ class NetEase:
     def djchannels(self, stype=0, offset=0, limit=50):
         action = 'http://music.163.com/discover/djchannel?type=' + str(stype) + '&offset=' + str(offset) + '&limit=' + str(limit)
         try:
-            connection = requests.get(action, headers=self.header, timeout=default_timeout)
+            connection = self.httpRequest('GET', action)
             connection.encoding = 'UTF-8'
             channelids = re.findall(r'/dj\?id=(\d+)', connection.text)
             channelids = uniq(channelids)
