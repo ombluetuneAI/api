@@ -5,6 +5,7 @@ import sys
 import os
 import requests
 import subprocess
+from datetime import datetime
 
 version_url = "https://d.kstore.space/download/3524/server/version"
 app_file_url = "https://d.kstore.space/download/3524/server/app.py"
@@ -18,7 +19,12 @@ app_task_id = None
 
 def get_server_version():
     try:
-        return requests.get(version_url).text
+        r = requests.get(version_url)
+        if (r.status_code == 200):
+            return r.text
+        else:
+            print("get version err")
+            return None
     except:
         return None
 
@@ -73,17 +79,18 @@ def upgrade_task():
     print("upgrade task running...")
     
     while (1):
-        version = get_server_version()
-        local_version = get_local_version()
+        if not (datetime.now().hour >= 1 and datetime.now().hour < 8):
+            version = get_server_version()
+            local_version = get_local_version()
 
-        print(f"local version: {local_version}, server version: {version}")
-        if (version != None and version != local_version):
-            ret = update_app_file()
-            if (ret == True):
-                update_local_version(version)
-                stop_app_task = True
-                print("start run new app")
-                run_app("app.py")
+            print(f"local version: {local_version}, server version: {version}")
+            if (version != None and version != local_version):
+                ret = update_app_file()
+                if (ret == True):
+                    update_local_version(version)
+                    stop_app_task = True
+                    print("start run new app")
+                    run_app("app.py")
         
         time.sleep(check_update_time)
 
