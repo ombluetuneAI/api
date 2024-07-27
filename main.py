@@ -16,7 +16,6 @@ check_update_time = (5 * 60)
 file_server_token = "null"
 upgrade_task_thread = None
 
-stop_app_task = False
 app_task_id = None
 
 def get_server_version():
@@ -77,7 +76,6 @@ def run_app(file):
 
 # 检查升级
 def upgrade_task():
-    global stop_app_task
     print("upgrade task running...")
     
     while (1):
@@ -90,7 +88,6 @@ def upgrade_task():
                 ret = update_app_file()
                 if (ret == True):
                     update_local_version(version)
-                    stop_app_task = True
                     print("start run new app")
                     run_app(run_file)
         
@@ -101,12 +98,8 @@ def main_task():
     # 创建升级任务
     upgrade_task_thread = threading.Thread(target=upgrade_task)
     upgrade_task_thread.start()
-    while (stop_app_task != True):
-        time.sleep(1)
-    
-    if (app_task_id != None):
-        os.kill(app_task_id, 9)
-        time.sleep(1)
+    while (1):
+        time.sleep(60)
 
 
 def __main__():
