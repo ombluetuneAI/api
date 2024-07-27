@@ -7,8 +7,10 @@ import requests
 import subprocess
 from datetime import datetime
 
+run_file = "api.py"
+
 version_url = "https://d.kstore.space/download/3524/server/version"
-app_file_url = "https://d.kstore.space/download/3524/server/app.py"
+app_file_url = f"https://d.kstore.space/download/3524/server/{run_file}"
 check_update_time = (5 * 60)
 
 file_server_token = "null"
@@ -42,7 +44,7 @@ def update_local_version(version):
 def update_app_file():
     try:
         data = requests.get(app_file_url).content
-        f = open("app.py", "wb+")
+        f = open(run_file, "wb+")
         f.write(data)
         f.close()
         return True
@@ -90,12 +92,12 @@ def upgrade_task():
                     update_local_version(version)
                     stop_app_task = True
                     print("start run new app")
-                    run_app("app.py")
+                    run_app(run_file)
         
         time.sleep(check_update_time)
 
 def main_task():
-    run_app("app.py")
+    run_app(run_file)
     # 创建升级任务
     upgrade_task_thread = threading.Thread(target=upgrade_task)
     upgrade_task_thread.start()
