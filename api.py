@@ -12,11 +12,90 @@ import threading
 from netease import NetEase
 from io import BytesIO
 from PIL import Image
+from fake_useragent import UserAgent
 
 disallow_type = ["Content-Encoding", "Content-Length", "Date", "Server", "Connection", "Transfer-Encoding", "Access-Control-Allow-Origin", 
                  "Access-Control-Allow-Methods", "Access-Control-Allow-Headers", "Strict-Transport-Security"]
 
 qweather_key = "none"
+proxy = None
+
+class Proxy:
+    def __init__(self):
+        self.proxy_pool = []
+        r = csv_read_list("proxy_pool.csv")
+        for i in r:
+            self.proxy_pool.append(i[0])
+        self.proxy_task_thread = None
+    
+    def start(self):
+        if (self.proxy_task_thread == None):
+            self.proxy_task_thread = threading.Thread(target=self._proxy_task)
+            self.proxy_task_thread.start()
+    
+    def stop(self):
+        if (self.proxy_task_thread != None):
+            self.proxy_task_thread.join()
+            self.proxy_task_thread = None
+
+    def get(self):
+        ip = None
+        if (len(self.proxy_pool)):
+            ip = random.choice(self.proxy_pool)
+        return ip
+
+    def delete(self, ip):
+        self.proxy_pool.remove(ip)
+        self._save_proxy()
+
+    def _proxy_task(self):
+        check_time = time.time()
+        while True:
+            self._generate_proxy()
+            if (len(self.proxy_pool) < 10):
+                time.sleep(2)
+            else:
+                time.sleep(random.randint(20, 3600))
+            
+            # 重新检查代理是否有效
+            if (time.time() - check_time > 4 * 3600):
+                for ip in self.proxy_pool:
+                    if (self._verify_proxy(ip) == False):
+                        self.delete(ip)
+
+    def _save_proxy(self, ip):
+        w_data = []
+        for i in self.proxy_pool:
+            w_data.append([i])
+        csv_write_list("proxy_pool.csv", w_data, "w")
+
+    def _add_proxy(self, ip):
+        if (ip not in self.proxy_pool):
+            self.proxy_pool.append(ip)
+            print(f"add proxy({len(self.proxy_pool)}): {ip}")
+            self._save_proxy()
+
+    def _generate_proxy(self):
+        ip = self.get()
+        proxies = None
+        if (ip != None):
+            proxies = {"http": "http://{}".format(ip)}
+        try:
+            ip = requests.get("http://demo.spiderpy.cn/get/", proxies=proxies, timeout=5, headers={'User-Agent':str(UserAgent().random)}).json().get("proxy")
+            if (ip):
+                if (self._verify_proxy(ip) == True):
+                    self._add_proxy(ip)
+        except:
+            print("request proxy error")
+
+    def _verify_proxy(self, proxy):
+        try:
+            r = requests.get("http://icanhazip.com/", proxies={"http": "http://{}".format(proxy)}, timeout=1, headers={'User-Agent':str(UserAgent().random)})
+            if (r.status_code == 200):
+                if (r.text.replace("\n", "") == str(proxy.split(":")[0])):
+                    return True
+        except:
+            return False
 
 def config_init():
     global qweather_key
@@ -389,9 +468,15 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"exec update_list finished")
             radio_list_update("favorite_radio.csv", "favorite_radio_table.csv")
             netease_list_update("netease_music.csv")
+        elif (path == "/get_proxy"):
+            ip = proxy.get()
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(ip.encode())
             
 
-
+proxy = Proxy()
+proxy.start()
 update_handle = threading.Thread(target=update_task).start()
 print("start server")
 config_init()
