@@ -195,12 +195,6 @@ def get_qweather(query):
 #     return r.status_code, r.headers, r.content
 
 def netease_get_rand_music():
-    info = {
-        "name": None,
-        "artistsname": None,
-        "url": None,
-        "picurl": None
-    }
     retry_cnt = 10
     while (retry_cnt):
         logging.info(f"request: {retry_cnt}")
@@ -210,7 +204,11 @@ def netease_get_rand_music():
             # 读取随机行
             rand_row = random.choice(music)
             info = _audio_csv_2_json(rand_row)
-            return info
+            
+            r = requests.get(info["url"])
+            if (r.url[-3:] != "404"):
+                info["url"] = r.url
+                return info
         except:
             logging.info("get err")
     return None
@@ -249,7 +247,7 @@ def get_rand_music(query):
     music_info = netease_get_rand_music()
     if (music_info):
         r_data = {
-            "code": 1,
+            "code": 200,
             "data": music_info
         }
         return json.dumps(r_data).encode("utf-8")
@@ -310,7 +308,7 @@ def get_rand_radio(query):
     music_info = random.choice(music_infos)
     if (music_info):
         r_data = {
-            "code": 1,
+            "code": 200,
             "data": music_info
         }
         return json.dumps(r_data).encode("utf-8")
@@ -321,7 +319,7 @@ def get_favorite_radio(query):
     music_info = _audio_csv_2_json(random.choice(music_infos))
     if (music_info):
         r_data = {
-            "code": 1,
+            "code": 200,
             "data": music_info
         }
         return json.dumps(r_data).encode("utf-8")
