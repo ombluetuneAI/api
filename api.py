@@ -22,10 +22,22 @@ qweather_key = "none"
 proxy = None
 en_proxy_task = False
 
+NETEASE_PLAYLIST_HOT = "./netease/hot.csv"
+NETEASE_PLAYLIST_ALL = "./netease/all.csv"
+netease_playlist = [NETEASE_PLAYLIST_HOT, NETEASE_PLAYLIST_ALL]
+
+FM_HOT_ID = "./fm/hot_id.csv"
+FM_ALL_ID = "./fm/all_id.csv"
+
+FM_PLAYLIST_HOT = "./fm/hot.csv"
+FM_PLAYLIST_ALL = "./fm/all.csv"
+
+PROXY_LIST = "./proxy_pool.csv"
+
 class Proxy:
     def __init__(self):
         self.proxy_pool = []
-        r = csv_read_list("proxy_pool.csv")
+        r = csv_read_list(PROXY_LIST)
         for i in r:
             self.proxy_pool.append(i[0])
         self.proxy_task_thread = None
@@ -85,7 +97,7 @@ class Proxy:
         w_data = []
         for i in self.proxy_pool:
             w_data.append([i])
-        csv_write_list("proxy_pool.csv", w_data, "w")
+        csv_write_list(PROXY_LIST, w_data, "w")
 
     def _add_proxy(self, ip):
         if (ip not in self.proxy_pool):
@@ -163,6 +175,12 @@ def csv_read_list(path):
 
     return data
 
+def csv_read_multi_list(paths):
+    data = []
+    for path in paths:
+        data += csv_read_list(path)
+    return data
+
 def csv_write_list(path, user_data, mode):
     if (len(user_data) == 0):
         return
@@ -200,7 +218,7 @@ def netease_get_rand_music():
         logging.info(f"request: {retry_cnt}")
         retry_cnt = retry_cnt - 1
         try:
-            music =  csv_read_list("netease_music.csv")
+            music =  csv_read_multi_list(netease_playlist)
             # 读取随机行
             rand_row = random.choice(music)
             info = _audio_csv_2_json(rand_row)
@@ -303,7 +321,7 @@ def fm_get_cur_id_info_csv(id):
     return music_infos
 
 def get_rand_radio(query):
-    ids = csv_read_list("fm_id.csv")
+    ids = csv_read_list(FM_ALL_ID)
     music_infos = fm_get_cur_id_info(random.choice(ids)[0])
     music_info = random.choice(music_infos)
     if (music_info):
@@ -315,7 +333,7 @@ def get_rand_radio(query):
     return None
 
 def get_favorite_radio(query):
-    music_infos = csv_read_list("favorite_radio_table.csv")
+    music_infos = csv_read_list(FM_PLAYLIST_HOT)
     music_info = _audio_csv_2_json(random.choice(music_infos))
     if (music_info):
         r_data = {
@@ -379,16 +397,16 @@ def radio_list_update(file_in, file_out):
     csv_write_list(file_out, radios, "w")
 
 def update_task():
-    if not os.path.exists("favorite_radio_table.csv"):
-        radio_list_update("favorite_radio.csv", "favorite_radio_table.csv")
-    if not os.path.exists("netease_music.csv"):
-        netease_list_update("netease_music.csv")
+    if not os.path.exists(FM_PLAYLIST_HOT):
+        radio_list_update(FM_HOT_ID, FM_PLAYLIST_HOT)
+    if not os.path.exists(NETEASE_PLAYLIST_HOT):
+        netease_list_update(NETEASE_PLAYLIST_HOT)
     while (1):
         # 北京时间
         hour = (datetime.now(timezone.utc).hour + 8) % 24
         if (hour == 2):
-            radio_list_update("favorite_radio.csv", "favorite_radio_table.csv")
-            netease_list_update("netease_music.csv")
+            radio_list_update(FM_HOT_ID, FM_PLAYLIST_HOT)
+            netease_list_update(NETEASE_PLAYLIST_HOT)
             time.sleep(3600 * 10)
         else:
             time.sleep(1800)
@@ -445,7 +463,7 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(data)
             else:
                 self.send_response(404)
-        elif (path == "/rand_radio"):
+        elif (path == "/rand_radio" or path == "/rand_fm"):
             data = get_rand_radio(query)
             if (data):
                 self.send_response(200)
@@ -455,7 +473,7 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(data)
             else:
                 self.send_response(404)
-        elif (path == "/favorite_radio"):
+        elif (path == "/favorite_radio" or path == "/hot_fm"):
             data = get_favorite_radio(query)
             if (data):
                 self.send_response(200)
@@ -499,8 +517,8 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"exec update_list finished")
-            radio_list_update("favorite_radio.csv", "favorite_radio_table.csv")
-            netease_list_update("netease_music.csv")
+            radio_list_update(FM_HOT_ID, FM_PLAYLIST_HOT)
+            netease_list_update(NETEASE_PLAYLIST_HOT)
         elif (path == "/get_proxy"):
             if (en_proxy_task == True):
                 ip = proxy.get()
