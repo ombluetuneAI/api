@@ -60,10 +60,10 @@ class Proxy:
             # 生成新的代理
             if (time.time() >= next_gen_time):
                 self._generate_proxy()
-                if (len(self.proxy_pool) < 10):
-                    gen_sleep = random.randint(1, 20)
+                if (len(self.proxy_pool) < 20):
+                    gen_sleep = random.randint(1, 60)
                 else:
-                    gen_sleep = random.randint(1, 1800)
+                    gen_sleep = random.randint(1, 600)
                 next_gen_time = time.time() + gen_sleep
                 logging.info(f"gen sleep {gen_sleep}")
             
@@ -73,7 +73,7 @@ class Proxy:
                 for ip in self.proxy_pool:
                     if (self._verify_proxy(ip) == False):
                         self.delete(ip)
-                check_sleep = 3600 * 4
+                check_sleep = 3600 * 2
                 next_check_time = time.time() + check_sleep
                 logging.info(f"check sleep {check_sleep}")
             
@@ -405,8 +405,7 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
         query_params = parse_qs(query)
         
         logging.info(parsed_path)
-
-        logging.info(path)
+        
         if (path == "/weather"):
             status_code, header, data = get_weather()
             self.send_response(status_code)
