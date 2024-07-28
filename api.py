@@ -26,6 +26,8 @@ NETEASE_PLAYLIST_HOT = "./netease/hot.csv"
 NETEASE_PLAYLIST_ALL = "./netease/all.csv"
 netease_playlist = [NETEASE_PLAYLIST_HOT, NETEASE_PLAYLIST_ALL]
 
+KG_PLAYLIST_HOT = "./kg/hot.csv"
+
 FM_HOT_ID = "./fm/hot_id.csv"
 FM_ALL_ID = "./fm/all_id.csv"
 
@@ -207,6 +209,29 @@ def get_qweather(query):
     r = requests.get(f"https://devapi.qweather.com/v7/weather/now?{query}")
     return r.status_code, r.headers, r.content
 
+def kg_get_rand_music():
+    retry_cnt = 10
+    while (retry_cnt):
+        logging.info(f"request: {retry_cnt}")
+        retry_cnt = retry_cnt - 1
+        try:
+            music =  csv_read_list(KG_PLAYLIST_HOT)
+            # 读取随机行
+            rand_row = random.choice(music) + ["pic_url"]
+            info = _audio_csv_2_json(rand_row)
+            
+            info_url = f"http://m.kugou.com/app/i/getSongInfo.php?cmd=playInfo&hash={info['url']}"
+            data = requests.get(info_url).json()
+            url = data.get("url").replace("https", "http")
+            pic_url = data.get("imgUrl").replace("{size}", "666")
+            if (len(url)):
+                info["url"] = url
+                info["picurl"] = pic_url
+                return info
+        except:
+            logging.info("get err")
+    return None
+
 # def get_netease_music(query):
 #     r = requests.get(f"https://api.uomg.com/api/rand.music?sort=%E7%83%AD%E6%AD%8C%E6%A6%9C&format=json")
 #     logging.info(r.text)
@@ -261,8 +286,9 @@ def netease_get_rand_music():
 #             logging.info(f"request err: {retry_cnt}")
 #     return None, None, None
 
-def get_rand_music(query):
-    music_info = netease_get_rand_music()
+def get_rand_music():
+    rand_music_list = [netease_get_rand_music, kg_get_rand_music]
+    music_info = random.choice(rand_music_list)()
     if (music_info):
         r_data = {
             "code": 200,
@@ -454,7 +480,7 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
         #         self.send_response(404)
         #         self.end_headers()
         elif (path == "/rand_music"):
-            data = get_rand_music(query)
+            data = get_rand_music()
             if (data):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
