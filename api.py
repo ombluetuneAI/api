@@ -54,15 +54,18 @@ class Proxy:
     def _proxy_task(self):
         next_gen_time = time.time()
         next_check_time = time.time()
+        gen_sleep = 3600
+        check_sleep = 3600
         while True:
             # 生成新的代理
             if (time.time() >= next_gen_time):
                 self._generate_proxy()
                 if (len(self.proxy_pool) < 10):
-                    next_gen_time = time.time() + 2
+                    gen_sleep = random.randint(1, 20)
                 else:
-                    next_gen_time = time.time() + random.randint(20, 3600)
-                logging.info(f"next gen time {int(next_gen_time - time.time())}")
+                    gen_sleep = random.randint(1, 1800)
+                next_gen_time = time.time() + gen_sleep
+                logging.info(f"gen sleep {gen_sleep}")
             
             # 重新检查代理是否有效
             if (time.time() >= next_check_time):
@@ -70,10 +73,13 @@ class Proxy:
                 for ip in self.proxy_pool:
                     if (self._verify_proxy(ip) == False):
                         self.delete(ip)
-                next_check_time = time.time() + 3600 * 4
-                logging.info(f"next check time {int(next_check_time - time.time())}")
+                check_sleep = 3600 * 4
+                next_check_time = time.time() + check_sleep
+                logging.info(f"check sleep {check_sleep}")
             
-            time.sleep(10)
+            time.sleep(min(gen_sleep, check_sleep) + 2)
+            gen_sleep = 3600
+            check_sleep = 3600
 
     def _save_proxy(self):
         w_data = []
