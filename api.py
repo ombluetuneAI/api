@@ -1,4 +1,4 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from aiohttp import web
 from urllib.parse import urlparse, parse_qs
 import requests
 import time
@@ -75,9 +75,9 @@ class Proxy:
             if (time.time() >= next_gen_time):
                 self._generate_proxy()
                 if (len(self.proxy_pool) < 20):
-                    gen_sleep = random.randint(1, 60)
+                    gen_sleep = random.randint(30, 120)
                 else:
-                    gen_sleep = random.randint(1, 600)
+                    gen_sleep = random.randint(60, 1000)
                 next_gen_time = time.time() + gen_sleep
                 logging.info(f"gen sleep {gen_sleep}")
             
@@ -137,7 +137,7 @@ class Proxy:
 def log_init():
     # 配置日志
     logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s %(levelname)s %(message)s',
+                        format='%(asctime)s.%(msecs)03d %(levelname)s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S',
                         handlers=[
                             logging.FileHandler('run.log'),  # 文件日志处理器
@@ -199,15 +199,51 @@ def _audio_csv_2_json(csv_data):
     }
     return info
 
+msuic_src = ["qq", "kg", "kw", "wy"]
+
+"""
+成功消息示例
+{
+    "code": 0,
+    "msg": "success", 
+    "url": "http://fs.youthandroid2.kugou.com/xxxxx.mp3'
+}
+"""
+music_err_url_rsp = {
+    "code": 1,
+    "msg": "未知错误"
+}
+
+def _music_url_api_1(src, id, quality='128k'):
+    # 音乐源1
+    url = f"https://render.niuma666bet.buzz/url/{src}/{id}/{quality}"
+    headers = {
+        "X-Request-Key": "share-v2"
+    }
+    try:
+        logging.info(f"request: {url}")
+        data = requests.get(url, headers=headers).json()
+    except:
+        data = music_err_url_rsp
+    return data
+
+def music_url_api(src, id, quality='128k'):
+    api_fun = [_music_url_api_1]
+    for api in api_fun:
+        data = api(src, id, quality)
+        if (data.get("msg", "") == "success"):
+            return data
+    return music_err_url_rsp
+
 
 location = "113.96,22.57"
 def get_weather():
     r = requests.get(f"https://devapi.qweather.com/v7/weather/now?location={location}&key={qweather_key}")
-    return r.status_code, r.headers, r.content
+    return r.json()
 
 def get_qweather(query):
     r = requests.get(f"https://devapi.qweather.com/v7/weather/now?{query}")
-    return r.status_code, r.headers, r.content
+    return r.json()
 
 def kg_get_rand_music():
     retry_cnt = 10
@@ -219,11 +255,14 @@ def kg_get_rand_music():
             # 读取随机行
             rand_row = random.choice(music) + ["pic_url"]
             info = _audio_csv_2_json(rand_row)
+            hash = info.get("url")
+
+            data = music_url_api('kg', hash, "320k")
             
-            info_url = f"http://m.kugou.com/app/i/getSongInfo.php?cmd=playInfo&hash={info['url']}"
-            data = requests.get(info_url).json()
+            # info_url = f"http://m.kugou.com/app/i/getSongInfo.php?cmd=playInfo&hash={info['url']}"
+            # data = requests.get(info_url).json()
             url = data.get("url").replace("https", "http")
-            pic_url = data.get("imgUrl").replace("{size}", "666")
+            pic_url = data.get("imgUrl", "").replace("{size}", "666")
             if (len(url)):
                 info["url"] = url
                 info["picurl"] = pic_url
@@ -281,7 +320,7 @@ def netease_get_rand_music():
 #                 r_data["data"]["artistsname"] = artistsname
 #                 r_data["data"]["url"] = url.replace("https://", "http://")
 #                 r_data["data"]["picurl"] = picurl.replace("https://", "http://")
-#                 return r.status_code, r.headers, json.dumps(r_data).encode("utf-8")
+#                 return r.status_code, r.headers, r_data
 #         except:
 #             logging.info(f"request err: {retry_cnt}")
 #     return None, None, None
@@ -294,8 +333,8 @@ def get_rand_music():
             "code": 200,
             "data": music_info
         }
-        return json.dumps(r_data).encode("utf-8")
-    return None
+        return r_data
+    return {"code": 404}
 
 def fm_get_cur_id_info(id):
     music_infos = []
@@ -346,7 +385,7 @@ def fm_get_cur_id_info_csv(id):
         music_infos.append([name,artistsname, url, picurl])
     return music_infos
 
-def get_rand_radio(query):
+def get_rand_radio():
     ids = csv_read_list(FM_ALL_ID)
     music_infos = fm_get_cur_id_info(random.choice(ids)[0])
     music_info = random.choice(music_infos)
@@ -355,10 +394,10 @@ def get_rand_radio(query):
             "code": 200,
             "data": music_info
         }
-        return json.dumps(r_data).encode("utf-8")
-    return None
+        return r_data
+    return {"code": 404}
 
-def get_favorite_radio(query):
+def get_favorite_radio():
     music_infos = csv_read_list(FM_PLAYLIST_HOT)
     music_info = _audio_csv_2_json(random.choice(music_infos))
     if (music_info):
@@ -366,11 +405,11 @@ def get_favorite_radio(query):
             "code": 200,
             "data": music_info
         }
-        return json.dumps(r_data).encode("utf-8")
-    return None
+        return r_data
+    return {"code": 404}
 
 def pic_resize(pic_url, w, h):
-    r = requests.get(pic_url)
+    r = requests.get(pic_url, timeout=5)
     if (r.status_code == 200):
         img_io = BytesIO(r.content)
         img = Image.open(img_io)
@@ -437,123 +476,56 @@ def update_task():
         else:
             time.sleep(1800)
 
+def music_api(src, params):
+    id = params.get("id")
+    quality = params.get("quality", ['128k'])
+    data = music_url_api(src, id, quality)
+    return data
+
+async def handle_request_api(req):
+    logging.info(f"req {req.url}")
+    src = req.match_info['src']
+    query = req.query
+    data = music_api(src, query)
+    return web.json_response(data)
+
 # 自定义的请求处理程序
-class MyHTTPRequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        # 解析请求路径和参数
-        parsed_path = urlparse(self.path)
-        path = parsed_path.path
-        query = parsed_path.query
-        query_params = parse_qs(query)
-        
-        logging.info(parsed_path)
-        
-        if (path == "/weather"):
-            status_code, header, data = get_weather()
-            self.send_response(status_code)
-            self.send_header("Content-Length", len(data))
-            for type in header:
-                if (type not in disallow_type):
-                    self.send_header(type, header[type])
-            self.end_headers()
-            self.wfile.write(data)
-        elif (path == "/qweather"):
-            status_code, header, data = get_qweather(query)
-            self.send_response(status_code)
-            self.send_header("Content-Length", len(data))
-            for type in header:
-                if (type not in disallow_type):
-                    self.send_header(type, header[type])
-            self.end_headers()
-            self.wfile.write(data)
-        # elif (path == "/netease_music"):
-        #     status_code, header, data = get_netease_music(query)
-        #     if (data):
-        #         self.send_response(status_code)
-        #         self.send_header("Content-Length", len(data))
-        #         for type in header:
-        #             if (type not in disallow_type):
-        #                 self.send_header(type, header[type])
-        #         self.end_headers()
-        #         self.wfile.write(data)
-        #     else:
-        #         self.send_response(404)
-        #         self.end_headers()
-        elif (path == "/rand_music"):
-            data = get_rand_music()
-            if (data):
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", len(data))
-                self.end_headers()
-                self.wfile.write(data)
-            else:
-                self.send_response(404)
-        elif (path == "/rand_radio" or path == "/rand_fm"):
-            data = get_rand_radio(query)
-            if (data):
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", len(data))
-                self.end_headers()
-                self.wfile.write(data)
-            else:
-                self.send_response(404)
-        elif (path == "/favorite_radio" or path == "/hot_fm"):
-            data = get_favorite_radio(query)
-            if (data):
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", len(data))
-                self.end_headers()
-                self.wfile.write(data)
-            else:
-                self.send_response(404)
-        elif (path == "/pic_resize"):
-            pic_url = query_params.get('url', [''])[0]
-            width = int(query_params.get('w', [''])[0])
-            height = int(query_params.get('h', [''])[0])
-            image,format = pic_resize(pic_url, width, height)
-            if (image):
-                self.send_response(200)
-                self.send_header("Content-Type", f"image/{format}")
-                self.send_header("Content-Length", len(image))
-                self.end_headers()
-                self.wfile.write(image)
-            else:
-                self.send_response(404)
-        elif (path == "/proxy"):
-            url = query_params.get('url', [''])[0]
-            list = {}
-            if (os.path.exists("http_remap.json")):
-                with open("http_remap.json", "r", encoding="utf-8") as f:
-                    list = json.load(f)
-            if ('http' not in url):
-                url = f'http://{url}'
-            for a in list:
-                if (a in url):
-                    url = url.replace(a, list[a])
-            logging.info(f"request: {url}")
-            response = requests.get(url)
-            self.send_response(200)
-            self.send_header('Content-type', response.headers['Content-Type'])
-            self.end_headers()
-            self.wfile.write(response.content)
-        elif (path == "/update_list"):
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"exec update_list finished")
-            radio_list_update(FM_HOT_ID, FM_PLAYLIST_HOT)
-            netease_list_update(NETEASE_PLAYLIST_HOT)
-        elif (path == "/get_proxy"):
-            if (en_proxy_task == True):
-                ip = proxy.get()
-                self.send_response(200)
-                self.end_headers()
-                self.wfile.write(ip.encode())
-            else:
-                self.send_response(404)
-            
+async def handle_request(req):
+    path = req.path
+    query = req.query
+
+    logging.info(f"req {req.url}")
+
+    if (path == "/weather"):
+        data = get_weather()
+        return web.json_response(data)
+    elif (path == "/qweather"):
+        data = get_qweather(query)
+        return web.json_response(data)
+    elif (path == "/rand_music"):
+        data = get_rand_music()
+        return web.json_response(data)
+    elif (path == "/rand_radio" or path == "/rand_fm"):
+        data = get_rand_radio()
+        return web.json_response(data)
+    elif (path == "/favorite_radio" or path == "/hot_fm"):
+        data = get_favorite_radio()
+        return web.json_response(data)
+    elif (path == "/get_proxy"):
+        ip = proxy.get()
+        return web.Response(status=200, text=ip, content_type="text/plain")
+    elif (path == "/pic_resize"):
+        pic_url = query.get('url', [''])
+        width = int(query.get('w', ['']))
+        height = int(query.get('h', ['']))
+        image,format = pic_resize(pic_url, width, height)
+        if (image):
+            return web.Response(body=image, content_type=f"image/{format}")
+        else:
+            return web.Response(status=404)
+
+api_get_param = ['/qweather', '/weather', '/rand_music', '/rand_radio', '/rand_fm', '/favorite_radio', '/hot_fm', '/get_proxy', '/pic_resize', '/api']
+
 log_init()
 config_init()
 if (en_proxy_task == True):
@@ -561,7 +533,13 @@ if (en_proxy_task == True):
     proxy.start()
 update_handle = threading.Thread(target=update_task).start()
 logging.info("start server")
-server_address = ('', 8888)
-httpd = HTTPServer(server_address, MyHTTPRequestHandler)
-httpd.serve_forever()
+app = web.Application()
+for p in api_get_param:
+    app.router.add_get(p, handle_request)
 
+if (en_proxy_task == True):
+    app.router.add_get("/get_proxy", handle_request)
+
+app.router.add_get('/api/{src}', handle_request_api)
+
+web.run_app(app, host='127.0.0.1', port=8888)
