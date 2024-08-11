@@ -132,7 +132,7 @@ class NetEase:
     def top_songlist(self, offset=0, limit=100):
         action = 'http://music.163.com/discover/toplist?id=3778678'
         try:
-            connection = self.httpRequest('GET', action)
+            connection = requests.get(action, headers=self.header, timeout=default_timeout, proxies=self.proxies)
             connection.encoding = 'UTF-8'
             songids = re.findall(r'/song\?id=(\d+)', connection.text)
             if songids == []:
@@ -187,7 +187,7 @@ class NetEase:
     def djchannels(self, stype=0, offset=0, limit=50):
         action = 'http://music.163.com/discover/djchannel?type=' + str(stype) + '&offset=' + str(offset) + '&limit=' + str(limit)
         try:
-            connection = self.httpRequest('GET', action)
+            connection = requests.get(action, headers=self.header, timeout=default_timeout, proxies=self.proxies)
             connection.encoding = 'UTF-8'
             channelids = re.findall(r'/dj\?id=(\d+)', connection.text)
             channelids = uniq(channelids)
