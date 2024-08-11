@@ -7,12 +7,9 @@ import json
 import os
 import csv
 import random
-from datetime import datetime, timedelta, timezone
-import threading
-from netease import NetEase
+from datetime import datetime, timedelta
 from io import BytesIO
 from PIL import Image
-from fake_useragent import UserAgent
 import logging
 
 disallow_type = ["Content-Encoding", "Content-Length", "Date", "Server", "Connection", "Transfer-Encoding", "Access-Control-Allow-Origin", 
@@ -35,104 +32,6 @@ FM_PLAYLIST_HOT = "./fm/hot.csv"
 FM_PLAYLIST_ALL = "./fm/all.csv"
 
 PROXY_LIST = "./proxy_pool.csv"
-
-class Proxy:
-    def __init__(self):
-        self.proxy_pool = []
-        r = csv_read_list(PROXY_LIST)
-        for i in r:
-            self.proxy_pool.append(i[0])
-        self.proxy_task_thread = None
-    
-    def start(self):
-        if (self.proxy_task_thread == None):
-            self.proxy_task_thread = threading.Thread(target=self._proxy_task)
-            self.proxy_task_thread.start()
-    
-    def stop(self):
-        if (self.proxy_task_thread != None):
-            self.proxy_task_thread.join()
-            self.proxy_task_thread = None
-
-    def get(self):
-        ip = None
-        if (len(self.proxy_pool)):
-            ip = random.choice(self.proxy_pool)
-        return ip
-
-    def delete(self, ip):
-        self.proxy_pool.remove(ip)
-        self._save_proxy()
-        logging.info(f"delete proxy({len(self.proxy_pool)}): {ip}")
-
-    def _proxy_task(self):
-        next_gen_time = time.time()
-        next_check_time = time.time()
-        gen_sleep = 3600
-        check_sleep = 3600
-        while True:
-            # 生成新的代理
-            if (time.time() >= next_gen_time):
-                self._generate_proxy()
-                if (len(self.proxy_pool) < 20):
-                    gen_sleep = random.randint(30, 120)
-                else:
-                    gen_sleep = random.randint(60, 1000)
-                next_gen_time = time.time() + gen_sleep
-                logging.info(f"gen sleep {gen_sleep}")
-            
-            # 重新检查代理是否有效
-            if (time.time() >= next_check_time):
-                logging.info("timing check proxy pool")
-                for ip in self.proxy_pool:
-                    if (self._verify_proxy(ip) == False):
-                        self.delete(ip)
-                check_sleep = 3600 * 2
-                next_check_time = time.time() + check_sleep
-                logging.info(f"check sleep {check_sleep}")
-            
-            time.sleep(min(gen_sleep, check_sleep) + 2)
-            gen_sleep = 3600
-            check_sleep = 3600
-
-    def _save_proxy(self):
-        w_data = []
-        for i in self.proxy_pool:
-            w_data.append([i])
-        csv_write_list(PROXY_LIST, w_data, "w")
-
-    def _add_proxy(self, ip):
-        if (ip not in self.proxy_pool):
-            self.proxy_pool.append(ip)
-            logging.info(f"add proxy({len(self.proxy_pool)}): {ip}")
-            self._save_proxy()
-
-    def _generate_proxy(self):
-        logging.info("generate proxy")
-        ip = self.get()
-        proxies = None
-        if (ip != None):
-            proxies = {"http": "http://{}".format(ip)}
-        try:
-            ip = requests.get("http://demo.spiderpy.cn/get/", proxies=proxies, timeout=5, headers={'User-Agent':str(UserAgent().random)}).json().get("proxy")
-            if (ip):
-                if (self._verify_proxy(ip) == True):
-                    self._add_proxy(ip)
-        except:
-            logging.info("generate proxy error")
-
-    def _verify_proxy(self, proxy):
-        ret = False
-        try:
-            r = requests.get("http://icanhazip.com/", proxies={"http": "http://{}".format(proxy)}, timeout=2, headers={'User-Agent':str(UserAgent().random)})
-            if (r.status_code == 200):
-                if (r.text.replace("\n", "") == str(proxy.split(":")[0])):
-                    ret = True
-        except:
-            pass
-        if (ret == False):
-            logging.info(f"verify {proxy} error")
-        return ret
 
 def log_init():
     # 配置日志
@@ -214,7 +113,7 @@ music_err_url_rsp = {
     "msg": "未知错误"
 }
 
-def _music_url_api_1(src, id, quality='128k'):
+def _music_url_api_1(src, id, mid, quality='128k'):
     # 音乐源1
     url = f"https://render.niuma666bet.buzz/url/{src}/{id}/{quality}"
     headers = {
@@ -227,10 +126,36 @@ def _music_url_api_1(src, id, quality='128k'):
         data = music_err_url_rsp
     return data
 
-def music_url_api(src, id, quality='128k'):
-    api_fun = [_music_url_api_1]
+def _music_url_api_2(src, id, mid, quality='320k'):
+    src_table = {
+        "tx": "qqmusic",
+        "kw": "kuwo",
+        "mg": "mgmusic"
+    }
+
+    if (src not in src_table or quality != '320k'): return music_err_url_rsp
+
+    # 音乐源1
+    url = f"https://api.leafone.cn/api/{src_table[src]}?id={mid}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    try:
+        logging.info(f"request: {url}")
+        _ = requests.get(url, headers=headers).json()
+        data = {
+            "code": 0,
+            "msg": "success", 
+            "url": _.get("data", []).get("url", "")
+        }
+    except:
+        data = music_err_url_rsp
+    return data
+
+def music_url_api(src, id, mid='', quality='128k'):
+    api_fun = [_music_url_api_1, _music_url_api_2]
     for api in api_fun:
-        data = api(src, id, quality)
+        data = api(src, id, mid, quality)
         if (data.get("msg", "") == "success"):
             return data
     return music_err_url_rsp
@@ -257,7 +182,7 @@ def kg_get_rand_music():
             info = _audio_csv_2_json(rand_row)
             hash = info.get("url")
 
-            data = music_url_api('kg', hash, "320k")
+            data = music_url_api('kg', hash, quality="320k")
             
             # info_url = f"http://m.kugou.com/app/i/getSongInfo.php?cmd=playInfo&hash={info['url']}"
             # data = requests.get(info_url).json()
@@ -429,57 +354,11 @@ def pic_resize(pic_url, w, h):
     else:
         return None, None
 
-def get_netease_top_list():
-    mp3 = 'http://music.163.com/song/media/outer/url?id='
-    lrc = 'http://music.163.com/api/song/lyric?id='
-
-    netease = NetEase()
-    all_data = netease.top_songlist()
-    csv_data = []
-
-    for data in all_data:
-        url = mp3 + str(data['id'])
-        lrc_url = lrc + str(data['id']) + '&lv=-1&kv=-1&tv=-1'
-        pic_url = data["album"]["picUrl"]
-        name = data['name']
-        artist = data['artists'][0]['name']
-        csv_data.append([name, artist, url, pic_url, lrc_url])
-
-    return csv_data
-
-def netease_list_update(file_out):
-    logging.info(f"netease_list_update")
-    music = get_netease_top_list()
-    csv_write_list(file_out, music, "w")
-
-def radio_list_update(file_in, file_out):
-    logging.info(f"radio_list_update {file_in}")
-    radios = []
-    ids = csv_read_list(file_in)
-    for id in ids:
-        radios += fm_get_cur_id_info_csv(id[0])
-    
-    csv_write_list(file_out, radios, "w")
-
-def update_task():
-    if not os.path.exists(FM_PLAYLIST_HOT):
-        radio_list_update(FM_HOT_ID, FM_PLAYLIST_HOT)
-    if not os.path.exists(NETEASE_PLAYLIST_HOT):
-        netease_list_update(NETEASE_PLAYLIST_HOT)
-    while (1):
-        # 北京时间
-        hour = (datetime.now(timezone.utc).hour + 8) % 24
-        if (hour == 2):
-            radio_list_update(FM_HOT_ID, FM_PLAYLIST_HOT)
-            netease_list_update(NETEASE_PLAYLIST_HOT)
-            time.sleep(3600 * 10)
-        else:
-            time.sleep(1800)
-
 def music_api(src, params):
     id = params.get("id")
+    mid = params.get("mid", "")
     quality = params.get("quality", ['128k'])
-    data = music_url_api(src, id, quality)
+    data = music_url_api(src, id, mid, quality)
     return data
 
 async def handle_request_api(req):
@@ -512,33 +391,33 @@ async def handle_request(req):
         data = get_favorite_radio()
         return web.json_response(data)
     elif (path == "/get_proxy"):
-        ip = proxy.get()
+        proxy_pool = csv_read_list(PROXY_LIST)
+        ip = random.choice(proxy_pool)[0]
         return web.Response(status=200, text=ip, content_type="text/plain")
     elif (path == "/pic_resize"):
-        pic_url = query.get('url', [''])
-        width = int(query.get('w', ['']))
-        height = int(query.get('h', ['']))
+        pic_url = query.get('url', "")
+        width = int(query.get('w', 100))
+        height = int(query.get('h', 100))
         image,format = pic_resize(pic_url, width, height)
         if (image):
             return web.Response(body=image, content_type=f"image/{format}")
         else:
             return web.Response(status=404)
+    elif (path == "/update_ploy"):
+        time = query.get('time', "3600")
+        with open("update_ploy", "w") as f:
+            f.write(time)
+        return web.Response(status=200, text="update_ploy", content_type="text/plain")
 
-api_get_param = ['/qweather', '/weather', '/rand_music', '/rand_radio', '/rand_fm', '/favorite_radio', '/hot_fm', '/get_proxy', '/pic_resize', '/api']
+api_get_param = ['/qweather', '/weather', '/rand_music', '/rand_radio', '/rand_fm', '/favorite_radio', '/hot_fm', '/get_proxy', '/pic_resize', '/api', '/update_ploy']
 
 log_init()
 config_init()
-if (en_proxy_task == True):
-    proxy = Proxy()
-    proxy.start()
-update_handle = threading.Thread(target=update_task).start()
+# update_handle = threading.Thread(target=update_task).start()
 logging.info("start server")
 app = web.Application()
 for p in api_get_param:
     app.router.add_get(p, handle_request)
-
-if (en_proxy_task == True):
-    app.router.add_get("/get_proxy", handle_request)
 
 app.router.add_get('/api/{src}', handle_request_api)
 
