@@ -1,0 +1,11 @@
+temp/
+logs/
+*.pyc
+cache/
+test/
+*.pid
+*.vbs
+addr.json
+__pycache__/
+.env
+
