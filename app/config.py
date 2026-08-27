@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    config_path: str = Field(default="F:/storage/config.json", validation_alias="CONFIG_PATH")
+    config_path: str = Field(default="D:/storage/config.json", validation_alias="CONFIG_PATH")
     api_host: str = Field(default="0.0.0.0", validation_alias="API_HOST")
     api_port: int = Field(default=8888, validation_alias="API_PORT")
     weather_location: str = "113.96,22.57"

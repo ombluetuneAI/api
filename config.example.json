@@ -2,6 +2,6 @@
     "qweather": {
         "token": "your-qweather-key"
     },
-    "music_path": "F:/storage/music",
+    "music_path": "D:/storage/music",
     "song_req_cache": "./cache/song_req_cache.csv"
 }
