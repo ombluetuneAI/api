@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import random
 import re
-import time
 from datetime import datetime
 
 import httpx
@@ -77,26 +76,6 @@ async def _get_rand_music(
         logger.info("get err")
     return None
 
-
-async def get_rand_music(client: httpx.AsyncClient, settings: Settings) -> dict:
-    src_table = [
-        ("tx", settings.tx_playlist_hot),
-        ("wy", settings.netease_playlist_hot),
-        ("kg", settings.kg_playlist_hot),
-        ("kw", settings.kw_playlist_hot),
-    ]
-    random.shuffle(src_table)
-    for src, playlist in src_table:
-        music_info = await _get_rand_music(client, settings, src, playlist)
-        if music_info:
-            return {"code": 200, "data": music_info}
-    return {"code": 404}
-
-
-async def music_api(
-    client: httpx.AsyncClient, src: str, song_id: str, mid: str = "", quality: str = "320k"
-) -> dict:
-    return await music_url_api(client, src, song_id, name=mid, artist="", quality=quality)
 
 
 async def get_rand_mv(client: httpx.AsyncClient, settings: Settings) -> str:

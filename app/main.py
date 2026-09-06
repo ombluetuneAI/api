@@ -7,7 +7,7 @@ from fastapi import FastAPI
 
 from app.config import get_settings
 from app.logging_setup import get_logger, setup_logger
-from app.routes import content, legacy, music_v1, pictures, proxy, radio_v1, videos, weather
+from app.routes import content, music_v1, pictures, proxy, radio_v1, videos, weather
 
 logger = get_logger(__name__)
 UA = (
@@ -36,7 +36,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app_kwargs: dict = {
         "title": "TXB API",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "lifespan": lifespan,
     }
     if settings.api_root_path:
@@ -54,7 +54,6 @@ def create_app() -> FastAPI:
     app.include_router(content.router)
     app.include_router(weather.router)
     app.include_router(proxy.router)
-    app.include_router(legacy.router)
 
     return app
 

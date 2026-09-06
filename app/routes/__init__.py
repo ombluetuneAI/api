@@ -1,6 +1,5 @@
 from app.routes import (
     content,
-    legacy,
     music_v1,
     pictures,
     proxy,
@@ -11,7 +10,6 @@ from app.routes import (
 
 __all__ = [
     "content",
-    "legacy",
     "music_v1",
     "pictures",
     "proxy",

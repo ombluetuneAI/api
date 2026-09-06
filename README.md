@@ -1,6 +1,6 @@
 # TXB API
 
-FastAPI + Uvicorn 实现的 HTTP API 服务（v2.0.0）。
+FastAPI + Uvicorn 实现的 HTTP API 服务（v2.1.0）。
 
 ## 启动
 
@@ -30,7 +30,6 @@ python run.py
 | content | `/content/v1` | 微博热搜 |
 | weather | `/weather/v1` | 天气 |
 | proxy | `/proxy/v1` | 随机代理 |
-| legacy | 根路径旧 URL | 已废弃，兼容旧客户端 |
 
 详细设计见 [PRD.md](PRD.md)。
 

@@ -4,11 +4,8 @@ import os
 
 from app.config import Settings
 from app.logging_setup import get_logger
-from app.services.cache_writer import save_song_request
 
 logger = get_logger(__name__)
-
-MUSIC_ERR_URL_RSP = {"code": 1, "msg": "未知错误"}
 
 
 def _song_name_change(name: str) -> str:
@@ -56,30 +53,8 @@ def _get_local_music_name(music_path: str, name: str) -> str:
     return ""
 
 
-def save_song_requests(settings: Settings, info: dict) -> None:
-    save_song_request(
-        settings,
-        song=info.get("song", ""),
-        src=info.get("src", ""),
-        id=info.get("id", ""),
-        mid=info.get("mid", ""),
-    )
-
-
 def find_local_url(settings: Settings, keyword: str) -> str | None:
     local_name = _get_local_music_name(settings.music_path, keyword)
     if local_name:
         return f"{settings.music_files_base_url}/{local_name}"
     return None
-
-
-def get_local_music(settings: Settings, info: dict) -> dict:
-    """Legacy response shape for /music endpoint."""
-    logger.info("find music %s", info["song"])
-    save_song_requests(settings, info)
-    data = dict(MUSIC_ERR_URL_RSP)
-    url = find_local_url(settings, info["song"])
-    if url:
-        data = {"code": 0, "msg": "success", "music_url": url}
-    logger.info("rsp %s", data)
-    return data

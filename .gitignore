@@ -3,9 +3,10 @@ logs/
 *.pyc
 cache/
 test/
+tests/
+scripts/
 *.pid
 *.vbs
 addr.json
 __pycache__/
 .env
-
