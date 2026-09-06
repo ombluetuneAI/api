@@ -1,6 +1,6 @@
 # TXB API
 
-FastAPI + Uvicorn 实现的 HTTP API 服务（v2.1.0）。
+FastAPI + Uvicorn 实现的 HTTP API 服务（v2.2.0）。
 
 ## 启动
 
@@ -41,19 +41,20 @@ python run.py
 |------|------|
 | `GET /music/v1/search?keyword=&limit=10` | 搜索 |
 | `GET /music/v1/playlists?src=&limit=20&resolve=false` | 歌单 |
-| `GET /music/v1/songs/play?keyword=&id=&src=&source=auto` | 统一取流 |
-| `GET /music/v1/songs/random?src=` | 随机一首 |
-| `GET /music/v1/songs/{id}?src=kw` | 按 ID 取流 |
+| `GET /music/v1/play?keyword=&id=&src=&mid=&source=auto` | 统一取流 |
+| `GET /music/v1/random?src=` | 随机一首 |
 
 `source`：`local` / `online` / `auto`（默认）
 
 ## 电台 `/radio/v1`
 
+返回字段与 music 相同（电台 `src=radio`，歌曲字段留空）。
+
 | 路径 | 说明 |
 |------|------|
-| `GET /radio/v1/stations/random` | 随机电台 |
-| `GET /radio/v1/stations?keyword=` | 电台点播 |
-| `GET /radio/v1/stations/favorites` | 热门电台 |
+| `GET /radio/v1/play?keyword=` | 电台点播 |
+| `GET /radio/v1/random` | 随机电台 |
+| `GET /radio/v1/favorites` | 热门电台 |
 
 ## 测试
 

@@ -41,8 +41,8 @@ async def playlists(
     return ok(data)
 
 
-@router.get("/songs/play")
-async def songs_play(
+@router.get("/play")
+async def play(
     request: Request,
     keyword: str = Query(default=""),
     id: str = Query(default=""),
@@ -73,8 +73,8 @@ async def songs_play(
     return ok(song)
 
 
-@router.get("/songs/random")
-async def songs_random(
+@router.get("/random")
+async def random_song(
     request: Request,
     src: str = Query(default=""),
 ):
@@ -86,30 +86,4 @@ async def songs_random(
         return fail(502, "随机取流失败")
     if not song or not song.get("url"):
         return fail(404, "当前没有可随机的曲目")
-    return ok(song)
-
-
-@router.get("/songs/{song_id}")
-async def songs_by_id(
-    request: Request,
-    song_id: str,
-    src: str = Query(default="kw"),
-    source: str = Query(default="online"),
-    quality: str = Query(default="320k"),
-):
-    client = get_http(request)
-    settings = get_app_settings(request)
-    try:
-        song = await music_play.play_song(
-            client,
-            settings,
-            song_id=song_id,
-            src=src,
-            source=source,
-            quality=quality,
-        )
-    except Exception:
-        return fail(502, "按 ID 取流失败")
-    if not song or not song.get("url"):
-        return fail(404, f"曲目不存在: {song_id}")
     return ok(song)

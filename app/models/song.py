@@ -17,12 +17,12 @@ def to_song(
     src: str = "",
     resolved_from: str | None = None,
 ) -> dict:
-    """Normalize track dict to Song response shape."""
+    """Normalize track dict to unified media response shape."""
     raw_id = str(data.get("id") or "")
     parsed_src, song_id = parse_prefixed_id(raw_id, default_src=src or "kw")
     final_src = src or parsed_src
 
-    song = {
+    return {
         "id": song_id,
         "src": final_src,
         "name": data.get("name") or "",
@@ -32,7 +32,7 @@ def to_song(
         "cover": (data.get("cover") or data.get("pic") or "").replace("https://", "http://"),
         "duration": data.get("duration"),
         "mv": data.get("mv") or "",
+        "category": data.get("category") or "",
+        "region": data.get("region") or "",
+        "resolved_from": resolved_from or data.get("resolved_from") or "",
     }
-    if resolved_from:
-        song["resolved_from"] = resolved_from
-    return song

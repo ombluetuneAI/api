@@ -36,7 +36,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app_kwargs: dict = {
         "title": "TXB API",
-        "version": "2.1.0",
+        "version": "2.2.0",
         "lifespan": lifespan,
     }
     if settings.api_root_path:

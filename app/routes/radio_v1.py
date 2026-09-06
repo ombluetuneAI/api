@@ -11,27 +11,8 @@ from app.services.v1 import radio as radio_v1
 router = APIRouter(prefix="/radio/v1", tags=["radio"])
 
 
-@router.get("/stations/random")
-async def stations_random(request: Request):
-    client = get_http(request)
-    settings = get_app_settings(request)
-    result = await radio_service.get_rand_radio(client, settings)
-    if result.get("code") != 200:
-        return fail(404, "未找到随机电台")
-    return ok(to_station(result.get("data") or {}))
-
-
-@router.get("/stations/favorites")
-async def stations_favorites(request: Request):
-    settings = get_app_settings(request)
-    result = radio_service.get_favorite_radio(settings)
-    if result.get("code") != 200:
-        return fail(404, "未找到热门电台")
-    return ok(to_station(result.get("data") or {}))
-
-
-@router.get("/stations")
-async def stations_by_keyword(
+@router.get("/play")
+async def play(
     request: Request,
     keyword: str = Query(default=""),
 ):
@@ -50,3 +31,22 @@ async def stations_by_keyword(
         station_id=str(track.get("id", "")).removeprefix("radio:"),
     )
     return ok(station)
+
+
+@router.get("/random")
+async def random_station(request: Request):
+    client = get_http(request)
+    settings = get_app_settings(request)
+    result = await radio_service.get_rand_radio(client, settings)
+    if result.get("code") != 200:
+        return fail(404, "未找到随机电台")
+    return ok(to_station(result.get("data") or {}))
+
+
+@router.get("/favorites")
+async def favorites(request: Request):
+    settings = get_app_settings(request)
+    result = radio_service.get_favorite_radio(settings)
+    if result.get("code") != 200:
+        return fail(404, "未找到热门电台")
+    return ok(to_station(result.get("data") or {}))
