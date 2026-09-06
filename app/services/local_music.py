@@ -1,15 +1,10 @@
 from __future__ import annotations
 
 import os
-import random
-from datetime import datetime, timedelta
-
-import httpx
 
 from app.config import Settings
 from app.logging_setup import get_logger
-from app.utils.audio import audio_csv_to_json
-from app.utils.csv_io import csv_read_list, csv_write_list
+from app.services.cache_writer import save_song_request
 
 logger = get_logger(__name__)
 
@@ -62,23 +57,29 @@ def _get_local_music_name(music_path: str, name: str) -> str:
 
 
 def save_song_requests(settings: Settings, info: dict) -> None:
-    line = [info["song"], info["src"], info["id"], info["mid"], ""]
-    rows = csv_read_list(settings.song_req_cache_file)
-    if not any(line[0] == row[0] for row in rows):
-        rows.append(line)
-        csv_write_list(settings.song_req_cache_file, rows, "w")
+    save_song_request(
+        settings,
+        song=info.get("song", ""),
+        src=info.get("src", ""),
+        id=info.get("id", ""),
+        mid=info.get("mid", ""),
+    )
+
+
+def find_local_url(settings: Settings, keyword: str) -> str | None:
+    local_name = _get_local_music_name(settings.music_path, keyword)
+    if local_name:
+        return f"{settings.music_files_base_url}/{local_name}"
+    return None
 
 
 def get_local_music(settings: Settings, info: dict) -> dict:
+    """Legacy response shape for /music endpoint."""
     logger.info("find music %s", info["song"])
     save_song_requests(settings, info)
     data = dict(MUSIC_ERR_URL_RSP)
-    local_name = _get_local_music_name(settings.music_path, info["song"])
-    if local_name:
-        data = {
-            "code": 0,
-            "msg": "success",
-            "music_url": f"{settings.music_files_base_url}/{local_name}",
-        }
+    url = find_local_url(settings, info["song"])
+    if url:
+        data = {"code": 0, "msg": "success", "music_url": url}
     logger.info("rsp %s", data)
     return data

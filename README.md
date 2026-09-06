@@ -1,6 +1,6 @@
 # TXB API
 
-FastAPI + Uvicorn 实现的 HTTP API 服务。
+FastAPI + Uvicorn 实现的 HTTP API 服务（v2.0.0）。
 
 ## 启动
 
@@ -9,45 +9,55 @@ pip install -r requirements.txt
 python run.py
 ```
 
-默认端口 **8888**。如需临时改用其他端口，可设置环境变量：
-
-```bash
-set API_PORT=1234
-python run.py
-```
+默认端口 **8888**。经 Nginx 代理访问：`http://{host}:10074/api/...`
 
 ## 配置
 
-继续使用 `F:/storage/config.json`（可用 `CONFIG_PATH` 覆盖）。API 读取字段：
+使用 `D:/storage/config.json`（可用 `CONFIG_PATH` 覆盖）：
 
 - `qweather.token` — 天气
 - `music_path` — 本地音乐目录
 - `song_req_cache` — 歌曲请求缓存 CSV
 
-## 数据目录
+## 接口域（v1）
 
-```
-data/fm/           # 电台源数据（API 读取）
-  all_id.csv       # /rand_radio 使用
-  hot_id.csv       # 生成 cache/fm/hot.csv 的输入
-  sources/         # 爬取用的分类电台列表（API 不读）
-cache/             # 运行时缓存（gitignore）
-```
+| 域 | 前缀 | 说明 |
+|----|------|------|
+| music | `/music/v1` | 搜索、歌单、点播、随机 |
+| radio | `/radio/v1` | 电台随机、点播、热门 |
+| pictures | `/pictures/v1` | 随机图片、裁切 |
+| videos | `/videos/v1` | 随机 MV |
+| content | `/content/v1` | 微博热搜 |
+| weather | `/weather/v1` | 天气 |
+| proxy | `/proxy/v1` | 随机代理 |
+| legacy | 根路径旧 URL | 已废弃，兼容旧客户端 |
 
-## 接口
+详细设计见 [PRD.md](PRD.md)。
+
+## 音乐 `/music/v1`
+
+统一响应：`{ "code": 200, "data": {}, "message": "ok" }`
 
 | 路径 | 说明 |
 |------|------|
-| `/health` | 健康检查 |
-| `/weather` | 和风天气 |
-| `/qweather` | 透传外部天气 URL（`?url=`） |
-| `/rand_music` | 随机音乐 |
-| `/rand_radio` `/rand_fm` | 随机电台 |
-| `/favorite_radio` `/hot_fm` | 热门电台 |
-| `/rand_mv` | MV 重定向 |
-| `/rand_pic` | 随机图片 |
-| `/pic_resize` | 图片裁切 |
-| `/get_proxy` | 随机代理 IP |
-| `/dailyhot` | 微博热搜 |
-| `/music` | 本地音乐匹配 |
-| `/api/{src}` | 音乐 URL 解析（当前有效源：`kw`） |
+| `GET /music/v1/search?keyword=&limit=10` | 搜索 |
+| `GET /music/v1/playlists?src=&limit=20&resolve=false` | 歌单 |
+| `GET /music/v1/songs/play?keyword=&id=&src=&source=auto` | 统一取流 |
+| `GET /music/v1/songs/random?src=` | 随机一首 |
+| `GET /music/v1/songs/{id}?src=kw` | 按 ID 取流 |
+
+`source`：`local` / `online` / `auto`（默认）
+
+## 电台 `/radio/v1`
+
+| 路径 | 说明 |
+|------|------|
+| `GET /radio/v1/stations/random` | 随机电台 |
+| `GET /radio/v1/stations?keyword=` | 电台点播 |
+| `GET /radio/v1/stations/favorites` | 热门电台 |
+
+## 测试
+
+```bash
+python -m pytest tests/ -q
+```

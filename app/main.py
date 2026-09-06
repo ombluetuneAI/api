@@ -5,9 +5,9 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI
 
-from app.config import Settings, get_settings
+from app.config import get_settings
 from app.logging_setup import get_logger, setup_logger
-from app.routes import content, media, music, proxy, radio, weather
+from app.routes import content, legacy, music_v1, pictures, proxy, radio_v1, videos, weather
 
 logger = get_logger(__name__)
 UA = (
@@ -33,18 +33,29 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="TXB API", lifespan=lifespan)
+    settings = get_settings()
+    app_kwargs: dict = {
+        "title": "TXB API",
+        "version": "2.0.0",
+        "lifespan": lifespan,
+    }
+    if settings.api_root_path:
+        app_kwargs["root_path"] = settings.api_root_path
+    app = FastAPI(**app_kwargs)
 
     @app.get("/health")
-    async def health():
+    def health():
         return {"status": "ok"}
 
-    app.include_router(weather.router)
-    app.include_router(music.router)
-    app.include_router(radio.router)
-    app.include_router(media.router)
+    app.include_router(music_v1.router)
+    app.include_router(radio_v1.router)
+    app.include_router(pictures.router)
+    app.include_router(videos.router)
     app.include_router(content.router)
+    app.include_router(weather.router)
     app.include_router(proxy.router)
+    app.include_router(legacy.router)
+
     return app
 
 

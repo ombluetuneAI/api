@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     config_path: str = Field(default="D:/storage/config.json", validation_alias="CONFIG_PATH")
     api_host: str = Field(default="0.0.0.0", validation_alias="API_HOST")
     api_port: int = Field(default=8888, validation_alias="API_PORT")
+    api_root_path: str = Field(default="/api", validation_alias="API_ROOT_PATH")
     weather_location: str = "113.96,22.57"
     music_files_base_url: str = "http://192.168.10.138:10074/files/music"
 

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request
 from app.deps import get_http
 from app.services import music as music_service
 
-router = APIRouter(tags=["content"])
+router = APIRouter(prefix="/content/v1", tags=["content"])
 
 
 @router.get("/dailyhot")
