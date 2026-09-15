@@ -17,21 +17,22 @@ router = APIRouter(prefix="/music/v1", tags=["music"])
 async def search(
     client: httpx.AsyncClient = Depends(get_http),
     keyword: str = Query(default=""),
+    src: str = Query(default="kw"),
     limit: int = Query(default=10, ge=1, le=50),
 ):
     try:
-        items = await play.search_songs(client, keyword, limit=limit)
+        data = await play.search_songs(client, keyword, limit=limit, src=src)
     except Exception:
         logger.exception("music search failed keyword=%s", keyword)
         return fail(502, "搜索上游失败")
-    return ok({"list": items, "total": len(items)})
+    return ok(data)
 
 
 @router.get("/playlists")
 async def playlists(
     client: httpx.AsyncClient = Depends(get_http),
     settings: Settings = Depends(get_app_settings),
-    src: str = Query(default=""),
+    src: str = Query(default="kw"),
     limit: int = Query(default=20, ge=1, le=50),
     resolve: bool = Query(default=False),
 ):
@@ -51,7 +52,7 @@ async def play_song(
     settings: Settings = Depends(get_app_settings),
     keyword: str = Query(default=""),
     id: str = Query(default=""),
-    src: str = Query(default=""),
+    src: str = Query(default="kw"),
     mid: str = Query(default=""),
     source: str = Query(default="auto"),
     quality: str = Query(default="320k"),
@@ -81,7 +82,7 @@ async def play_song(
 async def random_song(
     client: httpx.AsyncClient = Depends(get_http),
     settings: Settings = Depends(get_app_settings),
-    src: str = Query(default=""),
+    src: str = Query(default="kw"),
 ):
     try:
         song = await play.random_song(client, settings, src=src)

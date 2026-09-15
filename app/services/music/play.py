@@ -6,7 +6,8 @@ import httpx
 
 from app.config import Settings
 from app.models.song import parse_prefixed_id, to_song
-from app.services.music import kuwo, local
+from app.services.music import local
+from app.services.music import music_dl_api
 from app.services.music.cache import normalize_src, save_song_request
 from app.services.music.resolve import resolve_track
 from app.utils.audio import audio_csv_to_json
@@ -34,11 +35,21 @@ def _resolve_src_list(src: str) -> list[str]:
     return [normalize_src(src)]
 
 
+def _list_src_label(src: str) -> str:
+    if not (src or "").strip():
+        return "mixed"
+    return normalize_src(src)
+
+
 async def search_songs(
-    client: httpx.AsyncClient, keyword: str, limit: int = 10
-) -> list[dict]:
-    items = await kuwo.search_kuwo(client, keyword, limit=limit)
-    return [to_song(item, src="kw") for item in items]
+    client: httpx.AsyncClient, keyword: str, limit: int = 10, *, src: str = ""
+) -> dict:
+    items = await music_dl_api.search_songs(client, keyword, limit=limit, src=src)
+    return {
+        "list": items,
+        "total": len(items),
+        "src": _list_src_label(src),
+    }
 
 
 async def get_playlists(
@@ -61,7 +72,7 @@ async def get_playlists(
             rows_pool.append((normalize_src(s), rows))
 
     if not rows_pool:
-        return {"list": [], "total": 0, "src": "mixed" if not src else normalize_src(src)}
+        return {"list": [], "total": 0, "src": _list_src_label(src)}
 
     picked: list[tuple[str, dict]] = []
     attempts = 0
@@ -93,7 +104,7 @@ async def get_playlists(
     return {
         "list": [s for _, s in picked[:limit]],
         "total": len(picked[:limit]),
-        "src": "mixed" if not src else normalize_src(src),
+        "src": _list_src_label(src),
     }
 
 
@@ -183,8 +194,23 @@ async def random_song(
                     )
                     if track and track.get("url"):
                         return to_song(track, src=s)
-    track = await kuwo.random_track(client, settings)
-    if track and track.get("url"):
-        parsed_src, _ = parse_prefixed_id(track.get("id", ""), "kw")
-        return to_song(track, src=parsed_src)
+    sources = ["kw", "wy", "kg", "qq"] if not src else [normalize_src(src)]
+    random.shuffle(sources)
+    for s in sources:
+        path = _playlist_path(settings, s)
+        if not path:
+            continue
+        rows = csv_read_list(path)
+        if not rows:
+            continue
+        for _ in range(min(5, len(rows))):
+            info = audio_csv_to_json(random.choice(rows))
+            track = await resolve_track(
+                client,
+                src=s,
+                song_id=str(info.get("url", "")),
+                keyword=f"{info.get('name', '')}-{info.get('artists', '')}".strip("-"),
+            )
+            if track and track.get("url"):
+                return to_song(track, src=s)
     return None
