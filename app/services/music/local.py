@@ -3,9 +3,6 @@ from __future__ import annotations
 import os
 
 from app.config import Settings
-from app.logging_setup import get_logger
-
-logger = get_logger(__name__)
 
 
 def _song_name_change(name: str) -> str:

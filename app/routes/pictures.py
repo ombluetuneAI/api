@@ -1,15 +1,22 @@
-from fastapi import APIRouter, Query, Request
+from __future__ import annotations
+
+import httpx
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 
 from app.deps import get_http
-from app.services import image as image_service
+from app.services.pictures import image as pictures_service
 
 router = APIRouter(prefix="/pictures/v1", tags=["pictures"])
 
 
 @router.get("/random")
-async def random_pic(request: Request, w: int = Query(default=0), h: int = Query(default=0)):
-    image, fmt = await image_service.get_rand_pic(get_http(request), w, h)
+async def random_pic(
+    client: httpx.AsyncClient = Depends(get_http),
+    w: int = Query(default=0),
+    h: int = Query(default=0),
+):
+    image, fmt = await pictures_service.get_rand_pic(client, w, h)
     if image and fmt:
         return Response(content=image, media_type=f"image/{fmt}")
     return Response(status_code=404)
@@ -17,12 +24,12 @@ async def random_pic(request: Request, w: int = Query(default=0), h: int = Query
 
 @router.get("/resize")
 async def resize(
-    request: Request,
+    client: httpx.AsyncClient = Depends(get_http),
     url: str = Query(default=""),
     w: int = Query(default=100),
     h: int = Query(default=100),
 ):
-    image, fmt = await image_service.pic_resize(get_http(request), url, w, h)
+    image, fmt = await pictures_service.pic_resize(client, url, w, h)
     if image and fmt:
         return Response(content=image, media_type=f"image/{fmt}")
     return Response(status_code=404)

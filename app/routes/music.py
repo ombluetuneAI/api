@@ -1,49 +1,54 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, Request
+import httpx
+from fastapi import APIRouter, Depends, Query
 
+from app.config import Settings
 from app.deps import get_app_settings, get_http
+from app.logging_setup import get_logger
 from app.models.response import fail, ok
-from app.services import music_play
+from app.services.music import play
 
+logger = get_logger(__name__)
 router = APIRouter(prefix="/music/v1", tags=["music"])
 
 
 @router.get("/search")
 async def search(
-    request: Request,
+    client: httpx.AsyncClient = Depends(get_http),
     keyword: str = Query(default=""),
     limit: int = Query(default=10, ge=1, le=50),
 ):
-    client = get_http(request)
     try:
-        items = await music_play.search_songs(client, keyword, limit=limit)
+        items = await play.search_songs(client, keyword, limit=limit)
     except Exception:
+        logger.exception("music search failed keyword=%s", keyword)
         return fail(502, "搜索上游失败")
     return ok({"list": items, "total": len(items)})
 
 
 @router.get("/playlists")
 async def playlists(
-    request: Request,
+    client: httpx.AsyncClient = Depends(get_http),
+    settings: Settings = Depends(get_app_settings),
     src: str = Query(default=""),
     limit: int = Query(default=20, ge=1, le=50),
     resolve: bool = Query(default=False),
 ):
-    client = get_http(request)
-    settings = get_app_settings(request)
     try:
-        data = await music_play.get_playlists(
+        data = await play.get_playlists(
             client, settings, src=src, limit=limit, resolve=resolve
         )
     except Exception:
+        logger.exception("music playlists failed src=%s", src)
         return fail(502, "歌单读取失败")
     return ok(data)
 
 
 @router.get("/play")
-async def play(
-    request: Request,
+async def play_song(
+    client: httpx.AsyncClient = Depends(get_http),
+    settings: Settings = Depends(get_app_settings),
     keyword: str = Query(default=""),
     id: str = Query(default=""),
     src: str = Query(default=""),
@@ -53,10 +58,8 @@ async def play(
 ):
     if not keyword.strip() and not id.strip() and not mid.strip():
         return fail(400, "keyword 或 id 不能为空")
-    client = get_http(request)
-    settings = get_app_settings(request)
     try:
-        song = await music_play.play_song(
+        song = await play.play_song(
             client,
             settings,
             keyword=keyword,
@@ -67,6 +70,7 @@ async def play(
             quality=quality,
         )
     except Exception:
+        logger.exception("music play failed")
         return fail(502, "取流失败")
     if not song or not song.get("url"):
         return fail(404, "未找到可播放曲目")
@@ -75,14 +79,14 @@ async def play(
 
 @router.get("/random")
 async def random_song(
-    request: Request,
+    client: httpx.AsyncClient = Depends(get_http),
+    settings: Settings = Depends(get_app_settings),
     src: str = Query(default=""),
 ):
-    client = get_http(request)
-    settings = get_app_settings(request)
     try:
-        song = await music_play.random_song(client, settings, src=src)
+        song = await play.random_song(client, settings, src=src)
     except Exception:
+        logger.exception("music random failed src=%s", src)
         return fail(502, "随机取流失败")
     if not song or not song.get("url"):
         return fail(404, "当前没有可随机的曲目")

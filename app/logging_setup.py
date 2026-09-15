@@ -6,6 +6,9 @@ def setup_logger(log_file: str = "", level: int = logging.INFO) -> logging.Logge
     logger = logging.getLogger()
     logger.setLevel(level)
 
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
     if not logger.handlers:
         formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
 

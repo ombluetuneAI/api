@@ -6,9 +6,9 @@ import httpx
 
 from app.config import Settings
 from app.models.song import parse_prefixed_id, to_song
-from app.services import local_music
-from app.services.cache_writer import normalize_src, save_song_request
-from app.services.v1 import kuwo
+from app.services.music import kuwo, local
+from app.services.music.cache import normalize_src, save_song_request
+from app.services.music.resolve import resolve_track
 from app.utils.audio import audio_csv_to_json
 from app.utils.csv_io import csv_read_list
 
@@ -79,15 +79,15 @@ async def get_playlists(
             },
             src=s,
         )
-        if resolve and s == "kw" and song["id"]:
-            track = await kuwo.resolve_kuwo_play(
+        if resolve and song["id"]:
+            track = await resolve_track(
                 client,
-                rid=song["id"],
-                name=song["name"],
-                artists=song["artists"],
+                src=s,
+                song_id=song["id"],
+                keyword=f"{song['name']}-{song['artists']}".strip("-"),
             )
             if track:
-                song = to_song(track, src="kw")
+                song = to_song(track, src=s)
         picked.append((s, song))
 
     return {
@@ -117,7 +117,8 @@ async def play_song(
     if not kw and not unified_id:
         return None
 
-    if kw:
+    local_url = local.find_local_url(settings, kw) if kw else None
+    if kw and not local_url:
         save_song_request(
             settings,
             song=kw,
@@ -126,7 +127,6 @@ async def play_song(
             mid=mid.strip(),
         )
 
-    modes = []
     if source == "local":
         modes = ["local"]
     elif source == "online":
@@ -135,25 +135,26 @@ async def play_song(
         modes = ["local", "online"]
 
     for mode in modes:
-        if mode == "local" and kw:
-            url = local_music.find_local_url(settings, kw)
-            if url:
-                return to_song(
-                    {
-                        "id": unified_id,
-                        "name": kw.split("-")[0] if "-" in kw else kw,
-                        "artists": kw.split("-", 1)[1] if "-" in kw else "",
-                        "url": url,
-                    },
-                    src=src or "kw",
-                    resolved_from="local",
-                )
+        if mode == "local" and local_url:
+            return to_song(
+                {
+                    "id": unified_id,
+                    "name": kw.split("-")[0] if "-" in kw else kw,
+                    "artists": kw.split("-", 1)[1] if "-" in kw else "",
+                    "url": local_url,
+                },
+                src=src or "kw",
+                resolved_from="local",
+            )
         if mode == "online":
-            track = None
-            if unified_id and (src in ("", "kw") or not src):
-                track = await kuwo.resolve_by_id(client, unified_id)
-            elif kw and (src in ("", "kw") or not src):
-                track = await kuwo.search_and_resolve(client, kw)
+            track = await resolve_track(
+                client,
+                src=src,
+                song_id=unified_id,
+                mid=mid.strip(),
+                keyword=kw,
+                quality=quality,
+            )
             if track and track.get("url"):
                 parsed_src, _ = parse_prefixed_id(str(track.get("id", "")), src or "kw")
                 return to_song(track, src=src or parsed_src, resolved_from="online")
@@ -174,19 +175,12 @@ async def random_song(
                 for _ in range(min(5, len(rows))):
                     info = audio_csv_to_json(random.choice(rows))
                     s = normalize_src(src)
-                    if s == "kw":
-                        track = await kuwo.resolve_kuwo_play(
-                            client,
-                            rid=str(info.get("url", "")),
-                            name=info.get("name", ""),
-                            artists=info.get("artists", ""),
-                        )
-                    else:
-                        track = await kuwo.resolve_kuwo_play(
-                            client,
-                            name=info.get("name", ""),
-                            artists=info.get("artists", ""),
-                        )
+                    track = await resolve_track(
+                        client,
+                        src=s,
+                        song_id=str(info.get("url", "")),
+                        keyword=f"{info.get('name', '')}-{info.get('artists', '')}".strip("-"),
+                    )
                     if track and track.get("url"):
                         return to_song(track, src=s)
     track = await kuwo.random_track(client, settings)

@@ -5,13 +5,11 @@ from datetime import datetime, timedelta
 
 import httpx
 
-from app.config import Settings
-from app.utils.audio import audio_csv_to_json
-from app.utils.csv_io import csv_read_list
 
-
-async def fm_get_cur_id_info(client: httpx.AsyncClient, station_id: str) -> list[dict]:
-    r = await client.get(f"https://webapi.qingting.fm/api/pc/radio/{station_id}", timeout=3.0)
+async def fetch_programs(client: httpx.AsyncClient, station_id: str) -> list[dict]:
+    r = await client.get(
+        f"https://webapi.qingting.fm/api/pc/radio/{station_id}", timeout=3.0
+    )
     data = r.json()
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
     if not data.get("album"):
@@ -37,22 +35,3 @@ async def fm_get_cur_id_info(client: httpx.AsyncClient, station_id: str) -> list
             "pic": pic,
         })
     return music_infos
-
-
-async def get_rand_radio(client: httpx.AsyncClient, settings: Settings) -> dict:
-    ids = csv_read_list(settings.fm_all_id)
-    if not ids:
-        return {"code": 404}
-    music_infos = await fm_get_cur_id_info(client, random.choice(ids)[0])
-    if not music_infos:
-        return {"code": 404}
-    music_info = random.choice(music_infos)
-    return {"code": 200, "data": music_info}
-
-
-def get_favorite_radio(settings: Settings) -> dict:
-    music_infos = csv_read_list(settings.fm_playlist_hot)
-    if not music_infos:
-        return {"code": 404}
-    music_info = audio_csv_to_json(random.choice(music_infos))
-    return {"code": 200, "data": music_info}

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     fm_hot_id: str = "./data/fm/hot_id.csv"
     fm_all_id: str = "./data/fm/all_id.csv"
+    fm_sources_dir: str = "./data/fm/sources"
     fm_playlist_hot: str = "./cache/fm/hot.csv"
     netease_playlist_hot: str = "./cache/wy/hot.csv"
     kg_playlist_hot: str = "./cache/kg/hot.csv"

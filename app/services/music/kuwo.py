@@ -8,17 +8,13 @@ import re
 import httpx
 
 from app.config import Settings
+from app.constants import DEFAULT_UA
 from app.logging_setup import get_logger
-from app.services.v1.models import to_track
+from app.models.song import build_track
 from app.utils.audio import audio_csv_to_json
 from app.utils.csv_io import csv_read_list
 
 logger = get_logger(__name__)
-
-UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-)
 
 
 def _parse_kuwo_rid(musicrid: str) -> str:
@@ -73,7 +69,7 @@ async def search_kuwo(
         "rformat": "json",
         "encoding": "utf8",
     }
-    r = await client.get(url, params=params, headers={"User-Agent": UA}, timeout=8.0)
+    r = await client.get(url, params=params, headers={"User-Agent": DEFAULT_UA}, timeout=8.0)
     raw = _loads_maybe_python_dict(r.text)
     items = []
     for row in raw.get("abslist") or []:
@@ -83,7 +79,7 @@ async def search_kuwo(
         name = (row.get("SONGNAME") or row.get("NAME") or "").replace("&nbsp;", " ")
         artists = (row.get("ARTIST") or "").replace("&nbsp;", " ")
         items.append(
-            to_track(
+            build_track(
                 track_id=f"kw:{rid}",
                 name=name,
                 artists=artists,
@@ -103,7 +99,7 @@ async def _fetch_kuwo_info(client: httpx.AsyncClient, rid: str) -> dict:
         return {}
     url = f"http://m.kuwo.cn/newh5/singles/songinfoandlrc?musicId={rid}"
     try:
-        r = await client.get(url, headers={"User-Agent": UA}, timeout=5.0)
+        r = await client.get(url, headers={"User-Agent": DEFAULT_UA}, timeout=5.0)
         data = (r.json() or {}).get("data") or {}
         info = data.get("songinfo") or data
         return {
@@ -125,26 +121,24 @@ async def resolve_kuwo_play(
     name: str = "",
     artists: str = "",
 ) -> dict | None:
-    """Return playable Track or None."""
     meta = {}
     if rid and (not name or not artists):
         meta = await _fetch_kuwo_info(client, rid)
         name = name or meta.get("name", "")
         artists = artists or meta.get("artists", "")
 
-    # Prefer oiapi (name-artist) which returns url + picture + time
     query_name = name or rid
     query_artist = artists or ""
     oiapi = f"http://oiapi.net/API/Kuwo?msg={query_name}-{query_artist}&n=1&br=2"
     try:
         logger.info("kuwo oiapi: %s", oiapi)
-        r = await client.get(oiapi, headers={"User-Agent": UA}, timeout=5.0)
+        r = await client.get(oiapi, headers={"User-Agent": DEFAULT_UA}, timeout=5.0)
         raw = r.json()
         data = raw.get("data") or {}
         play_url = data.get("url") or ""
         if play_url:
             kid = str(data.get("id") or rid or "")
-            return to_track(
+            return build_track(
                 track_id=f"kw:{kid}" if kid else "",
                 name=data.get("song") or name or "",
                 artists=data.get("singer") or artists or "",
@@ -167,13 +161,13 @@ async def resolve_kuwo_play(
             logger.info("kuwo anti: %s", anti)
             r = await client.get(
                 anti,
-                headers={"User-Agent": UA, "Referer": "https://www.kuwo.cn/"},
+                headers={"User-Agent": DEFAULT_UA, "Referer": "https://www.kuwo.cn/"},
                 timeout=5.0,
             )
             raw = r.json()
             play_url = raw.get("url") or ""
             if play_url:
-                return to_track(
+                return build_track(
                     track_id=f"kw:{rid}",
                     name=name or "",
                     artists=artists or "",
@@ -204,7 +198,6 @@ async def search_and_resolve(
             artists=item.get("artists", ""),
         )
         if track and track.get("url"):
-            # keep search metadata if resolve missed some fields
             if not track.get("name"):
                 track["name"] = item.get("name", "")
             if not track.get("artists"):
@@ -221,7 +214,6 @@ async def resolve_by_id(client: httpx.AsyncClient, track_id: str) -> dict | None
     if track_id.startswith("kw:"):
         rid = track_id.removeprefix("kw:")
         return await resolve_kuwo_play(client, rid=rid)
-    # bare numeric id treat as kuwo
     if track_id.isdigit():
         return await resolve_kuwo_play(client, rid=track_id)
     return None
@@ -249,7 +241,6 @@ async def random_track(client: httpx.AsyncClient, settings: Settings) -> dict | 
                     client, rid=str(song_id), name=name, artists=artists
                 )
             else:
-                # non-kw sources: resolve via name-artist through kuwo oiapi
                 track = await resolve_kuwo_play(client, name=name, artists=artists)
             if track and track.get("url"):
                 if not track.get("name"):

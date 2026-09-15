@@ -7,17 +7,11 @@ from io import BytesIO
 import httpx
 from PIL import Image
 
+from app.constants import DEFAULT_UA
 from app.logging_setup import get_logger
-from app.utils.csv_io import csv_read_list
 
 logger = get_logger(__name__)
 
-UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0"
-)
-
-# 审计通过: imgapi.cn, api.suyanw.cn
 RAND_PIC_URLS = [
     "https://imgapi.cn/api.php",
     "https://api.suyanw.cn/api/meinv.php",
@@ -53,7 +47,7 @@ def _resize_image(content: bytes, w: int, h: int) -> tuple[bytes | None, str | N
 async def pic_resize(
     client: httpx.AsyncClient, pic_url: str, w: int, h: int
 ) -> tuple[bytes | None, str | None]:
-    r = await client.get(pic_url, headers={"User-Agent": UA}, timeout=5.0)
+    r = await client.get(pic_url, headers={"User-Agent": DEFAULT_UA}, timeout=5.0)
     if r.status_code != 200:
         return None, None
     logger.info("%s resize -> %s*%s", pic_url, w, h)
@@ -66,10 +60,3 @@ async def get_rand_pic(
     pic_url = random.choice(RAND_PIC_URLS)
     logger.info(pic_url)
     return await pic_resize(client, pic_url, width, height)
-
-
-def get_random_proxy(proxy_list_path: str) -> str | None:
-    proxy_pool = csv_read_list(proxy_list_path)
-    if not proxy_pool:
-        return None
-    return random.choice(proxy_pool)[0]

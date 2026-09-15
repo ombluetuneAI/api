@@ -2,13 +2,42 @@ from __future__ import annotations
 
 
 def parse_prefixed_id(raw_id: str, default_src: str = "kw") -> tuple[str, str]:
-    """Split legacy 'kw:228908' or return (default_src, raw_id)."""
+    """Split internal 'kw:228908' or return (default_src, raw_id)."""
     if not raw_id:
         return default_src, ""
     if ":" in raw_id:
         src, song_id = raw_id.split(":", 1)
         return src, song_id
     return default_src, raw_id
+
+
+def build_track(
+    *,
+    name: str,
+    artists: str,
+    url: str = "",
+    cover: str = "",
+    duration: int | None = None,
+    mv: str = "",
+    track_id: str = "",
+    track_type: str = "music",
+    album: str = "",
+) -> dict:
+    track = {
+        "name": name or "",
+        "artists": artists or "",
+        "url": (url or "").replace("https://", "http://"),
+        "cover": (cover or "").replace("https://", "http://"),
+        "duration": duration,
+        "mv": mv or "",
+    }
+    if track_id:
+        track["id"] = track_id
+    if track_type:
+        track["type"] = track_type
+    if album:
+        track["album"] = album
+    return track
 
 
 def to_song(

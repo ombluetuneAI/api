@@ -1,19 +1,19 @@
 from app.routes import (
     content,
-    music_v1,
+    music,
     pictures,
     proxy,
-    radio_v1,
+    radio,
     videos,
     weather,
 )
 
 __all__ = [
     "content",
-    "music_v1",
+    "music",
     "pictures",
     "proxy",
-    "radio_v1",
+    "radio",
     "videos",
     "weather",
 ]

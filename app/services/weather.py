@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 _cache_weather: dict = {}
 
 
-async def get_weather(client: httpx.AsyncClient, settings: Settings) -> dict:
+async def get_current(client: httpx.AsyncClient, settings: Settings) -> dict:
     global _cache_weather
     if _cache_weather:
         cache_time = int(
@@ -41,6 +41,6 @@ async def get_weather(client: httpx.AsyncClient, settings: Settings) -> dict:
     return data
 
 
-async def get_qweather(client: httpx.AsyncClient, target_url: str) -> dict:
+async def fetch_proxy_url(client: httpx.AsyncClient, target_url: str) -> dict:
     r = await client.get(target_url)
     return r.json()
