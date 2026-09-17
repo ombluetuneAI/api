@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     tx_playlist_hot: str = "./cache/tx/hot.csv"
     proxy_list: str = "./cache/proxy_pool.csv"
     song_req_cache: str = "./cache/song_req_cache.csv"
+    local_music_index: str = "./cache/local_music_index.csv"
 
     @property
     def runtime(self) -> dict:
@@ -47,6 +48,10 @@ class Settings(BaseSettings):
     @property
     def song_req_cache_file(self) -> str:
         return self.runtime.get("song_req_cache", self.song_req_cache)
+
+    @property
+    def local_music_index_file(self) -> str:
+        return self.runtime.get("local_music_index", self.local_music_index)
 
 
 @lru_cache

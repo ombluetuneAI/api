@@ -3,5 +3,6 @@
         "token": "your-qweather-key"
     },
     "music_path": "D:/storage/music",
-    "song_req_cache": "./cache/song_req_cache.csv"
+    "song_req_cache": "./cache/song_req_cache.csv",
+    "local_music_index": "./cache/local_music_index.csv"
 }

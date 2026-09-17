@@ -18,6 +18,13 @@ python run.py
 - `qweather.token` — 天气
 - `music_path` — 本地音乐目录
 - `song_req_cache` — 歌曲请求缓存 CSV
+- `local_music_index` — 本地曲库索引 CSV（列：`name,filename`）
+
+首次或曲库批量变更后，在项目根目录执行：
+
+```bash
+python scripts/fill_local_music_index.py
+```
 
 ## 接口域（v1）
 
