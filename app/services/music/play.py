@@ -21,6 +21,13 @@ PLAYLIST_SOURCES = {
     "qq": "tx_playlist_hot",
 }
 
+def normalize_song_keyword(keyword: str) -> str:
+    """统一歌名/keyword，便于本地文件名与 CSV（| -> @，/ -> ,）。"""
+    s = (keyword or "").strip()
+    s = s.replace("|", "@")
+    s = s.replace("/", ",")
+    return s
+
 
 def _playlist_path(settings: Settings, src: str) -> str:
     attr = PLAYLIST_SOURCES.get(normalize_src(src))
@@ -124,7 +131,7 @@ async def play_song(
     if src in {"qq"} and not unified_id and mid:
         unified_id = mid.strip()
 
-    kw = keyword.strip()
+    kw = normalize_song_keyword(keyword)
     if not kw and not unified_id:
         return None
 
@@ -190,7 +197,9 @@ async def random_song(
                         client,
                         src=s,
                         song_id=str(info.get("url", "")),
-                        keyword=f"{info.get('name', '')}-{info.get('artists', '')}".strip("-"),
+                        keyword=normalize_song_keyword(
+                            f"{info.get('name', '')}-{info.get('artists', '')}".strip("-")
+                        ),
                     )
                     if track and track.get("url"):
                         return to_song(track, src=s)
@@ -209,7 +218,9 @@ async def random_song(
                 client,
                 src=s,
                 song_id=str(info.get("url", "")),
-                keyword=f"{info.get('name', '')}-{info.get('artists', '')}".strip("-"),
+                keyword=normalize_song_keyword(
+                    f"{info.get('name', '')}-{info.get('artists', '')}".strip("-")
+                ),
             )
             if track and track.get("url"):
                 return to_song(track, src=s)
