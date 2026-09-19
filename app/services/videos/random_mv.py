@@ -6,11 +6,13 @@ import httpx
 
 from app.config import Settings
 from app.services.music import play
+from app.services.music.playlist_hot import ensure_hot_csv
 from app.utils.audio import audio_csv_to_json
 from app.utils.csv_io import csv_read_list
 
 
 async def random_mv_url(client: httpx.AsyncClient, settings: Settings) -> str:
+    await ensure_hot_csv(client, settings, "wy")
     rows = csv_read_list(settings.netease_playlist_hot)
     if rows:
         for _ in range(min(5, len(rows))):

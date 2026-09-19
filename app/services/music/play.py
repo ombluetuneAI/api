@@ -9,6 +9,7 @@ from app.models.song import parse_prefixed_id, to_song
 from app.services.music import local
 from app.services.music import music_dl_api
 from app.services.music.cache import normalize_src, save_song_request
+from app.services.music.playlist_hot import ensure_hot_csv, ensure_hot_csv_many
 from app.services.music.resolve import resolve_track
 from app.utils.audio import audio_csv_to_json
 from app.utils.csv_io import csv_read_list
@@ -48,6 +49,19 @@ def _list_src_label(src: str) -> str:
     return normalize_src(src)
 
 
+async def _playlist_rows(
+    client: httpx.AsyncClient,
+    settings: Settings,
+    src: str,
+) -> list[list[str]]:
+    s = normalize_src(src)
+    await ensure_hot_csv(client, settings, s)
+    path = _playlist_path(settings, s)
+    if not path:
+        return []
+    return csv_read_list(path)
+
+
 async def search_songs(
     client: httpx.AsyncClient, keyword: str, limit: int = 10, *, src: str = ""
 ) -> dict:
@@ -69,12 +83,10 @@ async def get_playlists(
 ) -> dict:
     limit = max(1, min(limit, 50))
     sources = _resolve_src_list(src)
+    await ensure_hot_csv_many(client, settings, sources)
     rows_pool: list[tuple[str, list]] = []
     for s in sources:
-        path = _playlist_path(settings, s)
-        if not path:
-            continue
-        rows = csv_read_list(path)
+        rows = await _playlist_rows(client, settings, s)
         if rows:
             rows_pool.append((normalize_src(s), rows))
 
@@ -186,30 +198,26 @@ async def random_song(
     src: str = "",
 ) -> dict | None:
     if src:
-        path = _playlist_path(settings, src)
-        if path:
-            rows = csv_read_list(path)
-            if rows:
-                for _ in range(min(5, len(rows))):
-                    info = audio_csv_to_json(random.choice(rows))
-                    s = normalize_src(src)
-                    track = await resolve_track(
-                        client,
-                        src=s,
-                        song_id=str(info.get("url", "")),
-                        keyword=normalize_song_keyword(
-                            f"{info.get('name', '')}-{info.get('artists', '')}".strip("-")
-                        ),
-                    )
-                    if track and track.get("url"):
-                        return to_song(track, src=s)
+        rows = await _playlist_rows(client, settings, src)
+        if rows:
+            for _ in range(min(5, len(rows))):
+                info = audio_csv_to_json(random.choice(rows))
+                s = normalize_src(src)
+                track = await resolve_track(
+                    client,
+                    src=s,
+                    song_id=str(info.get("url", "")),
+                    keyword=normalize_song_keyword(
+                        f"{info.get('name', '')}-{info.get('artists', '')}".strip("-")
+                    ),
+                )
+                if track and track.get("url"):
+                    return to_song(track, src=s)
     sources = ["kw", "wy", "kg", "qq"] if not src else [normalize_src(src)]
     random.shuffle(sources)
+    await ensure_hot_csv_many(client, settings, sources)
     for s in sources:
-        path = _playlist_path(settings, s)
-        if not path:
-            continue
-        rows = csv_read_list(path)
+        rows = await _playlist_rows(client, settings, s)
         if not rows:
             continue
         for _ in range(min(5, len(rows))):
