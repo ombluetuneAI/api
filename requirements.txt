@@ -1,0 +1,4 @@
+aiohttp>=3.9
+requests>=2.31
+Pillow>=10.0
+fake-useragent>=1.4
